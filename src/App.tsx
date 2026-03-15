@@ -14,6 +14,8 @@ import Projects from "./pages/Projects";
 import Canvas from "./pages/Canvas";
 import Docs from "./pages/Docs";
 import Reports from "./pages/Reports";
+import ProjectBoard from "./pages/ProjectBoard";
+import ProjectCanvas from "./pages/ProjectCanvas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
