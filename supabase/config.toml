@@ -2,3 +2,6 @@ project_id = "fgqgtbayopteqlqbqylk"
 
 [functions.generate-diagram]
 verify_jwt = false
+
+[functions.wiki-ai]
+verify_jwt = false
