@@ -83,6 +83,9 @@ export default function Projects() {
                     <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}/wiki`); }}>
                       <BookOpen className="h-3 w-3 mr-1" /> Wiki
                     </Button>
+                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}/dashboard`); }}>
+                      <BarChart3 className="h-3 w-3 mr-1" /> Dashboard
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
