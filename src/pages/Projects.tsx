@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { FolderKanban, ArrowRight } from "lucide-react";
+import { FolderKanban, ArrowRight, BookOpen, PenTool } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Project {
