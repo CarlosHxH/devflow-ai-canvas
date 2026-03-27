@@ -17,6 +17,7 @@ import Reports from "./pages/Reports";
 import ProjectBoard from "./pages/ProjectBoard";
 import ProjectCanvas from "./pages/ProjectCanvas";
 import ProjectWiki from "./pages/ProjectWiki";
+import ProjectDashboard from "./pages/ProjectDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
