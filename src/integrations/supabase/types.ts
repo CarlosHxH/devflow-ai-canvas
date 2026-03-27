@@ -297,6 +297,57 @@ export type Database = {
         }
         Relationships: []
       }
+      wiki_pages: {
+        Row: {
+          content_markdown: string | null
+          created_at: string
+          created_by: string
+          id: string
+          parent_id: string | null
+          position: number
+          project_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content_markdown?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          parent_id?: string | null
+          position?: number
+          project_id: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          content_markdown?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          parent_id?: string | null
+          position?: number
+          project_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wiki_pages_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "wiki_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wiki_pages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_members: {
         Row: {
           created_at: string
