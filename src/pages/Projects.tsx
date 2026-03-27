@@ -78,7 +78,10 @@ export default function Projects() {
                       <FolderKanban className="h-3 w-3 mr-1" /> Board
                     </Button>
                     <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}/canvas`); }}>
-                      Canvas
+                      <PenTool className="h-3 w-3 mr-1" /> Canvas
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}/wiki`); }}>
+                      <BookOpen className="h-3 w-3 mr-1" /> Wiki
                     </Button>
                   </div>
                 </CardContent>
