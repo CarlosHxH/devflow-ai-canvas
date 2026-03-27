@@ -17,6 +17,7 @@ import Reports from "./pages/Reports";
 import ProjectBoard from "./pages/ProjectBoard";
 import ProjectCanvas from "./pages/ProjectCanvas";
 import ProjectWiki from "./pages/ProjectWiki";
+import ProjectDashboard from "./pages/ProjectDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,7 @@ const App = () => (
               <Route path="/projects/:projectId/board" element={<ProtectedRoute><ProjectBoard /></ProtectedRoute>} />
               <Route path="/projects/:projectId/canvas" element={<ProtectedRoute><ProjectCanvas /></ProtectedRoute>} />
               <Route path="/projects/:projectId/wiki" element={<ProtectedRoute><ProjectWiki /></ProtectedRoute>} />
+              <Route path="/projects/:projectId/dashboard" element={<ProtectedRoute><ProjectDashboard /></ProtectedRoute>} />
               <Route path="/canvas" element={<ProtectedRoute><Canvas /></ProtectedRoute>} />
               <Route path="/docs" element={<ProtectedRoute><Docs /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />

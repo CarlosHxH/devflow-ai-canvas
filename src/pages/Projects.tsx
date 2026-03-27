@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { FolderKanban, ArrowRight, BookOpen, PenTool } from "lucide-react";
+import { FolderKanban, ArrowRight, BookOpen, PenTool, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Project {
@@ -82,6 +82,9 @@ export default function Projects() {
                     </Button>
                     <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}/wiki`); }}>
                       <BookOpen className="h-3 w-3 mr-1" /> Wiki
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}/dashboard`); }}>
+                      <BarChart3 className="h-3 w-3 mr-1" /> Dashboard
                     </Button>
                   </div>
                 </CardContent>
