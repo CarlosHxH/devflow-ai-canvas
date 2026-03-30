@@ -103,13 +103,23 @@ export function KanbanBoard({ projectId }: Props) {
   }, [tasks, filterPriority, filterAssignee]);
 
   const handleDragStart = (e: DragStartEvent) => {
-    const task = tasks.find((t) => t.id === e.active.id);
+    const { active } = e;
+    // Column drag
+    if (active.data.current?.type === "column-sortable") {
+      const col = statuses.find((s) => s.id === active.data.current?.statusId);
+      if (col) setActiveColumn(col);
+      return;
+    }
+    // Task drag
+    const task = tasks.find((t) => t.id === active.id);
     if (task) setActiveTask(task);
   };
 
   const handleDragOver = (e: DragOverEvent) => {
     const { active, over } = e;
     if (!over) return;
+    // Skip if dragging a column
+    if (active.data.current?.type === "column-sortable") return;
 
     const activeId = active.id as string;
     const overId = over.id as string;
@@ -132,14 +142,33 @@ export function KanbanBoard({ projectId }: Props) {
   };
 
   const handleDragEnd = async (e: DragEndEvent) => {
-    setActiveTask(null);
     const { active, over } = e;
-    if (!over) return;
 
+    // Column reorder
+    if (active.data.current?.type === "column-sortable") {
+      setActiveColumn(null);
+      if (!over || active.id === over.id) return;
+      const activeStatusId = active.data.current.statusId as string;
+      const overStatusId = over.data.current?.statusId as string;
+      if (!overStatusId) return;
+      const oldIdx = statuses.findIndex((s) => s.id === activeStatusId);
+      const newIdx = statuses.findIndex((s) => s.id === overStatusId);
+      if (oldIdx < 0 || newIdx < 0 || oldIdx === newIdx) return;
+      const reordered = arrayMove(statuses, oldIdx, newIdx);
+      setStatuses(reordered);
+      // Persist new positions
+      await Promise.all(reordered.map((s, i) =>
+        supabase.from("project_statuses").update({ position: i }).eq("id", s.id)
+      ));
+      return;
+    }
+
+    // Task drag end
+    setActiveTask(null);
+    if (!over) return;
     const activeId = active.id as string;
     const task = tasks.find((t) => t.id === activeId);
     if (!task) return;
-
     await supabase.from("tasks").update({ status_id: task.status_id, position: task.position }).eq("id", activeId);
   };
 
