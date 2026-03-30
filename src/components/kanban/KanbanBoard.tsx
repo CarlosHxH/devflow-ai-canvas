@@ -255,25 +255,26 @@ export function KanbanBoard({ projectId }: Props) {
       />
 
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {statuses.map((status, idx) => (
-            <KanbanColumn
-              key={status.id}
-              status={status}
-              tasks={filteredTasks.filter((t) => t.status_id === status.id)}
-              isFirst={idx === 0}
-              isLast={idx === statuses.length - 1}
-              onAddTask={(sid) => setAddingToStatus(sid)}
-              onTaskClick={(t) => { setSelectedTask(t); setDetailOpen(true); }}
-              onDeleteTask={handleDeleteTask}
-              onRename={handleRenameColumn}
-              onChangeColor={handleChangeColumnColor}
-              onMove={handleMoveColumn}
-              onDelete={handleDeleteColumn}
-            />
-          ))}
+        <SortableContext items={statuses.map((s) => `column-${s.id}`)} strategy={horizontalListSortingStrategy}>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {statuses.map((status, idx) => (
+              <KanbanColumn
+                key={status.id}
+                status={status}
+                tasks={filteredTasks.filter((t) => t.status_id === status.id)}
+                isFirst={idx === 0}
+                isLast={idx === statuses.length - 1}
+                onAddTask={(sid) => setAddingToStatus(sid)}
+                onTaskClick={(t) => { setSelectedTask(t); setDetailOpen(true); }}
+                onDeleteTask={handleDeleteTask}
+                onRename={handleRenameColumn}
+                onChangeColor={handleChangeColumnColor}
+                onMove={handleMoveColumn}
+                onDelete={handleDeleteColumn}
+              />
+            ))}
 
-          {/* Add column button */}
+            {/* Add column button */}
           <div className="flex flex-col w-72 shrink-0">
             {addingColumn ? (
               <div className="space-y-2 p-3 rounded-lg bg-muted/30 border border-dashed border-muted-foreground/30">
