@@ -162,6 +162,57 @@ export function KanbanBoard({ projectId }: Props) {
     fetchData();
   };
 
+  // --- Column management ---
+  const handleRenameColumn = async (statusId: string, newName: string) => {
+    await supabase.from("project_statuses").update({ name: newName }).eq("id", statusId);
+    fetchData();
+  };
+
+  const handleChangeColumnColor = async (statusId: string, newColor: string) => {
+    await supabase.from("project_statuses").update({ color: newColor }).eq("id", statusId);
+    fetchData();
+  };
+
+  const handleMoveColumn = async (statusId: string, direction: "left" | "right") => {
+    const idx = statuses.findIndex((s) => s.id === statusId);
+    if (idx < 0) return;
+    const swapIdx = direction === "left" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= statuses.length) return;
+    const a = statuses[idx];
+    const b = statuses[swapIdx];
+    await Promise.all([
+      supabase.from("project_statuses").update({ position: b.position }).eq("id", a.id),
+      supabase.from("project_statuses").update({ position: a.position }).eq("id", b.id),
+    ]);
+    fetchData();
+  };
+
+  const handleDeleteColumn = async (statusId: string) => {
+    const tasksInCol = tasks.filter((t) => t.status_id === statusId);
+    if (tasksInCol.length > 0) {
+      toast({ title: "Não é possível excluir", description: "Mova ou exclua as tarefas desta coluna primeiro.", variant: "destructive" });
+      return;
+    }
+    await supabase.from("project_statuses").delete().eq("id", statusId);
+    fetchData();
+    toast({ title: "Coluna excluída" });
+  };
+
+  const [addingColumn, setAddingColumn] = useState(false);
+  const [newColumnName, setNewColumnName] = useState("");
+
+  const handleAddColumn = async () => {
+    if (!newColumnName.trim()) return;
+    await supabase.from("project_statuses").insert({
+      project_id: projectId,
+      name: newColumnName.trim(),
+      position: statuses.length,
+    });
+    setNewColumnName("");
+    setAddingColumn(false);
+    fetchData();
+  };
+
   return (
     <div className="space-y-4">
       <TaskFilters
@@ -174,16 +225,45 @@ export function KanbanBoard({ projectId }: Props) {
 
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4">
-          {statuses.map((status) => (
+          {statuses.map((status, idx) => (
             <KanbanColumn
               key={status.id}
               status={status}
               tasks={filteredTasks.filter((t) => t.status_id === status.id)}
+              isFirst={idx === 0}
+              isLast={idx === statuses.length - 1}
               onAddTask={(sid) => setAddingToStatus(sid)}
               onTaskClick={(t) => { setSelectedTask(t); setDetailOpen(true); }}
               onDeleteTask={handleDeleteTask}
+              onRename={handleRenameColumn}
+              onChangeColor={handleChangeColumnColor}
+              onMove={handleMoveColumn}
+              onDelete={handleDeleteColumn}
             />
           ))}
+
+          {/* Add column button */}
+          <div className="flex flex-col w-72 shrink-0">
+            {addingColumn ? (
+              <div className="space-y-2 p-3 rounded-lg bg-muted/30 border border-dashed border-muted-foreground/30">
+                <Input
+                  value={newColumnName}
+                  onChange={(e) => setNewColumnName(e.target.value)}
+                  placeholder="Nome da coluna"
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddColumn(); if (e.key === "Escape") setAddingColumn(false); }}
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleAddColumn} disabled={!newColumnName.trim()} className="flex-1">Criar</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setAddingColumn(false)}>Cancelar</Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="outline" className="border-dashed text-muted-foreground h-10" onClick={() => setAddingColumn(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Nova coluna
+              </Button>
+            )}
+          </div>
         </div>
         <DragOverlay>
           {activeTask ? <TaskCard task={activeTask} onClick={() => {}} /> : null}
