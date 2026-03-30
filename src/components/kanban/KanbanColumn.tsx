@@ -16,6 +16,7 @@ interface Props {
   tasks: TaskData[];
   onAddTask: (statusId: string) => void;
   onTaskClick: (task: TaskData) => void;
+  onDeleteTask: (taskId: string) => void;
 }
 
 export function KanbanColumn({ status, tasks, onAddTask, onTaskClick }: Props) {
