@@ -61,8 +61,25 @@ export function TaskCard({ task, onClick, onDelete }: Props) {
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-medium leading-tight">{task.title}</span>
+        <span className="text-sm font-medium leading-tight flex-1">{task.title}</span>
         <Badge variant="outline" className={`text-[10px] shrink-0 ${prio.className}`}>{prio.label}</Badge>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+            <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity -mr-1 -mt-0.5">
+              <MoreHorizontal className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-36">
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onClick(); }}>
+              <Pencil className="h-3 w-3 mr-2" /> Editar
+            </DropdownMenuItem>
+            {onDelete && (
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}>
+                <Trash2 className="h-3 w-3 mr-2" /> Excluir
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {task.description && (
