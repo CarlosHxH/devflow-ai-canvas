@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors, closestCorners, DragOverlay } from "@dnd-kit/core";
-import { arrayMove } from "@dnd-kit/sortable";
+import { arrayMove, SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +37,7 @@ export function KanbanBoard({ projectId }: Props) {
   const [tasks, setTasks] = useState<TaskData[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [activeTask, setActiveTask] = useState<TaskData | null>(null);
+  const [activeColumn, setActiveColumn] = useState<StatusColumn | null>(null);
   const [selectedTask, setSelectedTask] = useState<TaskData | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [filterPriority, setFilterPriority] = useState("all");
@@ -102,13 +103,23 @@ export function KanbanBoard({ projectId }: Props) {
   }, [tasks, filterPriority, filterAssignee]);
 
   const handleDragStart = (e: DragStartEvent) => {
-    const task = tasks.find((t) => t.id === e.active.id);
+    const { active } = e;
+    // Column drag
+    if (active.data.current?.type === "column-sortable") {
+      const col = statuses.find((s) => s.id === active.data.current?.statusId);
+      if (col) setActiveColumn(col);
+      return;
+    }
+    // Task drag
+    const task = tasks.find((t) => t.id === active.id);
     if (task) setActiveTask(task);
   };
 
   const handleDragOver = (e: DragOverEvent) => {
     const { active, over } = e;
     if (!over) return;
+    // Skip if dragging a column
+    if (active.data.current?.type === "column-sortable") return;
 
     const activeId = active.id as string;
     const overId = over.id as string;
@@ -131,14 +142,33 @@ export function KanbanBoard({ projectId }: Props) {
   };
 
   const handleDragEnd = async (e: DragEndEvent) => {
-    setActiveTask(null);
     const { active, over } = e;
-    if (!over) return;
 
+    // Column reorder
+    if (active.data.current?.type === "column-sortable") {
+      setActiveColumn(null);
+      if (!over || active.id === over.id) return;
+      const activeStatusId = active.data.current.statusId as string;
+      const overStatusId = over.data.current?.statusId as string;
+      if (!overStatusId) return;
+      const oldIdx = statuses.findIndex((s) => s.id === activeStatusId);
+      const newIdx = statuses.findIndex((s) => s.id === overStatusId);
+      if (oldIdx < 0 || newIdx < 0 || oldIdx === newIdx) return;
+      const reordered = arrayMove(statuses, oldIdx, newIdx);
+      setStatuses(reordered);
+      // Persist new positions
+      await Promise.all(reordered.map((s, i) =>
+        supabase.from("project_statuses").update({ position: i }).eq("id", s.id)
+      ));
+      return;
+    }
+
+    // Task drag end
+    setActiveTask(null);
+    if (!over) return;
     const activeId = active.id as string;
     const task = tasks.find((t) => t.id === activeId);
     if (!task) return;
-
     await supabase.from("tasks").update({ status_id: task.status_id, position: task.position }).eq("id", activeId);
   };
 
@@ -225,25 +255,26 @@ export function KanbanBoard({ projectId }: Props) {
       />
 
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {statuses.map((status, idx) => (
-            <KanbanColumn
-              key={status.id}
-              status={status}
-              tasks={filteredTasks.filter((t) => t.status_id === status.id)}
-              isFirst={idx === 0}
-              isLast={idx === statuses.length - 1}
-              onAddTask={(sid) => setAddingToStatus(sid)}
-              onTaskClick={(t) => { setSelectedTask(t); setDetailOpen(true); }}
-              onDeleteTask={handleDeleteTask}
-              onRename={handleRenameColumn}
-              onChangeColor={handleChangeColumnColor}
-              onMove={handleMoveColumn}
-              onDelete={handleDeleteColumn}
-            />
-          ))}
+        <SortableContext items={statuses.map((s) => `column-${s.id}`)} strategy={horizontalListSortingStrategy}>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {statuses.map((status, idx) => (
+              <KanbanColumn
+                key={status.id}
+                status={status}
+                tasks={filteredTasks.filter((t) => t.status_id === status.id)}
+                isFirst={idx === 0}
+                isLast={idx === statuses.length - 1}
+                onAddTask={(sid) => setAddingToStatus(sid)}
+                onTaskClick={(t) => { setSelectedTask(t); setDetailOpen(true); }}
+                onDeleteTask={handleDeleteTask}
+                onRename={handleRenameColumn}
+                onChangeColor={handleChangeColumnColor}
+                onMove={handleMoveColumn}
+                onDelete={handleDeleteColumn}
+              />
+            ))}
 
-          {/* Add column button */}
+            {/* Add column button */}
           <div className="flex flex-col w-72 shrink-0">
             {addingColumn ? (
               <div className="space-y-2 p-3 rounded-lg bg-muted/30 border border-dashed border-muted-foreground/30">
@@ -266,8 +297,14 @@ export function KanbanBoard({ projectId }: Props) {
             )}
           </div>
         </div>
+        </SortableContext>
         <DragOverlay>
           {activeTask ? <TaskCard task={activeTask} onClick={() => {}} /> : null}
+          {activeColumn ? (
+            <div className="w-72 h-10 rounded-lg bg-muted/60 border border-primary/20 flex items-center justify-center text-sm font-semibold text-muted-foreground">
+              {activeColumn.name}
+            </div>
+          ) : null}
         </DragOverlay>
       </DndContext>
 

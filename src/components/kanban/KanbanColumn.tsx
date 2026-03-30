@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { TaskCard, TaskData } from "./TaskCard";
@@ -6,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, MoreHorizontal, Pencil, Trash2, ArrowLeft, ArrowRight, Palette } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, GripVertical, Palette } from "lucide-react";
 
 interface StatusColumn {
   id: string;
@@ -40,7 +42,26 @@ export function KanbanColumn({
   onAddTask, onTaskClick, onDeleteTask,
   onRename, onChangeColor, onMove, onDelete,
 }: Props) {
-  const { setNodeRef, isOver } = useDroppable({ id: status.id, data: { type: "column" } });
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: status.id, data: { type: "column" } });
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: `column-${status.id}`,
+    data: { type: "column-sortable", statusId: status.id },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(status.name);
   const [colorOpen, setColorOpen] = useState(false);
@@ -52,9 +73,23 @@ export function KanbanColumn({
     setEditing(false);
   };
 
+  const startEditing = () => {
+    setEditName(status.name);
+    setEditing(true);
+  };
+
   return (
-    <div className="flex flex-col w-72 shrink-0">
-      <div className="flex items-center gap-2 mb-3 px-1">
+    <div ref={setSortableRef} style={style} className="flex flex-col w-72 shrink-0">
+      <div className="flex items-center gap-1.5 mb-3 px-1 group/header">
+        {/* Drag handle for column reorder */}
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0 touch-none"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+
         <Popover open={colorOpen} onOpenChange={setColorOpen}>
           <PopoverTrigger asChild>
             <button className="h-3 w-3 rounded-full shrink-0 ring-2 ring-transparent hover:ring-primary/30 transition-all cursor-pointer" style={{ backgroundColor: status.color }} />
@@ -83,7 +118,13 @@ export function KanbanColumn({
             autoFocus
           />
         ) : (
-          <h3 className="text-sm font-semibold truncate">{status.name}</h3>
+          <h3
+            className="text-sm font-semibold truncate cursor-pointer hover:text-primary transition-colors select-none"
+            onDoubleClick={startEditing}
+            title="Duplo-clique para renomear"
+          >
+            {status.name}
+          </h3>
         )}
 
         <span className="text-xs text-muted-foreground ml-auto shrink-0">{tasks.length}</span>
@@ -95,24 +136,13 @@ export function KanbanColumn({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem onClick={() => { setEditName(status.name); setEditing(true); }}>
+            <DropdownMenuItem onClick={startEditing}>
               <Pencil className="h-3.5 w-3.5 mr-2" /> Renomear
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setColorOpen(true)}>
               <Palette className="h-3.5 w-3.5 mr-2" /> Alterar cor
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            {!isFirst && (
-              <DropdownMenuItem onClick={() => onMove(status.id, "left")}>
-                <ArrowLeft className="h-3.5 w-3.5 mr-2" /> Mover para esquerda
-              </DropdownMenuItem>
-            )}
-            {!isLast && (
-              <DropdownMenuItem onClick={() => onMove(status.id, "right")}>
-                <ArrowRight className="h-3.5 w-3.5 mr-2" /> Mover para direita
-              </DropdownMenuItem>
-            )}
-            {(!isFirst || !isLast) && <DropdownMenuSeparator />}
             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete(status.id)}>
               <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir coluna
             </DropdownMenuItem>
@@ -121,7 +151,7 @@ export function KanbanColumn({
       </div>
 
       <div
-        ref={setNodeRef}
+        ref={setDroppableRef}
         className={`flex-1 space-y-2 p-2 rounded-lg min-h-[200px] transition-colors ${isOver ? "bg-primary/5 border border-primary/20" : "bg-muted/30"}`}
       >
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
