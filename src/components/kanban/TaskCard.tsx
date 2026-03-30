@@ -34,6 +34,7 @@ const priorityConfig: Record<string, { label: string; className: string }> = {
 interface Props {
   task: TaskData;
   onClick: () => void;
+  onDelete?: (taskId: string) => void;
 }
 
 export function TaskCard({ task, onClick }: Props) {
