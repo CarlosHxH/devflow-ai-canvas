@@ -37,7 +37,7 @@ interface Props {
   onDelete?: (taskId: string) => void;
 }
 
-export function TaskCard({ task, onClick }: Props) {
+export function TaskCard({ task, onClick, onDelete }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { type: "task", task },
