@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { TaskCard, TaskData } from "./TaskCard";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Plus, MoreHorizontal, Pencil, Trash2, ArrowLeft, ArrowRight, Palette } from "lucide-react";
 
 interface StatusColumn {
   id: string;
@@ -11,23 +15,109 @@ interface StatusColumn {
   position: number;
 }
 
+const PRESET_COLORS = [
+  "#6366f1", "#8b5cf6", "#a855f7", "#ec4899",
+  "#ef4444", "#f97316", "#eab308", "#22c55e",
+  "#14b8a6", "#06b6d4", "#3b82f6", "#64748b",
+];
+
 interface Props {
   status: StatusColumn;
   tasks: TaskData[];
+  isFirst: boolean;
+  isLast: boolean;
   onAddTask: (statusId: string) => void;
   onTaskClick: (task: TaskData) => void;
   onDeleteTask: (taskId: string) => void;
+  onRename: (statusId: string, newName: string) => void;
+  onChangeColor: (statusId: string, newColor: string) => void;
+  onMove: (statusId: string, direction: "left" | "right") => void;
+  onDelete: (statusId: string) => void;
 }
 
-export function KanbanColumn({ status, tasks, onAddTask, onTaskClick, onDeleteTask }: Props) {
+export function KanbanColumn({
+  status, tasks, isFirst, isLast,
+  onAddTask, onTaskClick, onDeleteTask,
+  onRename, onChangeColor, onMove, onDelete,
+}: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: status.id, data: { type: "column" } });
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(status.name);
+  const [colorOpen, setColorOpen] = useState(false);
+
+  const handleRename = () => {
+    if (editName.trim() && editName.trim() !== status.name) {
+      onRename(status.id, editName.trim());
+    }
+    setEditing(false);
+  };
 
   return (
     <div className="flex flex-col w-72 shrink-0">
       <div className="flex items-center gap-2 mb-3 px-1">
-        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: status.color }} />
-        <h3 className="text-sm font-semibold">{status.name}</h3>
-        <span className="text-xs text-muted-foreground ml-auto">{tasks.length}</span>
+        <Popover open={colorOpen} onOpenChange={setColorOpen}>
+          <PopoverTrigger asChild>
+            <button className="h-3 w-3 rounded-full shrink-0 ring-2 ring-transparent hover:ring-primary/30 transition-all cursor-pointer" style={{ backgroundColor: status.color }} />
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-2" align="start">
+            <div className="grid grid-cols-4 gap-1.5">
+              {PRESET_COLORS.map((c) => (
+                <button
+                  key={c}
+                  className={`h-6 w-6 rounded-full transition-all hover:scale-110 ${c === status.color ? "ring-2 ring-primary ring-offset-2" : ""}`}
+                  style={{ backgroundColor: c }}
+                  onClick={() => { onChangeColor(status.id, c); setColorOpen(false); }}
+                />
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {editing ? (
+          <Input
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onBlur={handleRename}
+            onKeyDown={(e) => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") setEditing(false); }}
+            className="h-6 text-sm font-semibold px-1 py-0"
+            autoFocus
+          />
+        ) : (
+          <h3 className="text-sm font-semibold truncate">{status.name}</h3>
+        )}
+
+        <span className="text-xs text-muted-foreground ml-auto shrink-0">{tasks.length}</span>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={() => { setEditName(status.name); setEditing(true); }}>
+              <Pencil className="h-3.5 w-3.5 mr-2" /> Renomear
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setColorOpen(true)}>
+              <Palette className="h-3.5 w-3.5 mr-2" /> Alterar cor
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {!isFirst && (
+              <DropdownMenuItem onClick={() => onMove(status.id, "left")}>
+                <ArrowLeft className="h-3.5 w-3.5 mr-2" /> Mover para esquerda
+              </DropdownMenuItem>
+            )}
+            {!isLast && (
+              <DropdownMenuItem onClick={() => onMove(status.id, "right")}>
+                <ArrowRight className="h-3.5 w-3.5 mr-2" /> Mover para direita
+              </DropdownMenuItem>
+            )}
+            {(!isFirst || !isLast) && <DropdownMenuSeparator />}
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete(status.id)}>
+              <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir coluna
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div
