@@ -57,7 +57,7 @@ export function TaskCard({ task, onClick, onDelete }: Props) {
       style={style}
       {...attributes}
       {...listeners}
-      className="p-3 cursor-grab active:cursor-grabbing hover:border-primary/40 transition-colors space-y-2"
+      className="p-3 cursor-grab active:cursor-grabbing hover:border-primary/40 transition-colors space-y-2 group"
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
       <div className="flex items-start justify-between gap-2">
