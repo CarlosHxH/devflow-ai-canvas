@@ -19,7 +19,7 @@ interface Props {
   onDeleteTask: (taskId: string) => void;
 }
 
-export function KanbanColumn({ status, tasks, onAddTask, onTaskClick }: Props) {
+export function KanbanColumn({ status, tasks, onAddTask, onTaskClick, onDeleteTask }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: status.id, data: { type: "column" } });
 
   return (
