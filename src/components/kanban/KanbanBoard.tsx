@@ -37,6 +37,7 @@ export function KanbanBoard({ projectId }: Props) {
   const [tasks, setTasks] = useState<TaskData[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [activeTask, setActiveTask] = useState<TaskData | null>(null);
+  const [activeColumn, setActiveColumn] = useState<StatusColumn | null>(null);
   const [selectedTask, setSelectedTask] = useState<TaskData | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [filterPriority, setFilterPriority] = useState("all");
