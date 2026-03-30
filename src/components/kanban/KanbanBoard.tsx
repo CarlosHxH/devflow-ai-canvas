@@ -138,8 +138,13 @@ export function KanbanBoard({ projectId }: Props) {
     const task = tasks.find((t) => t.id === activeId);
     if (!task) return;
 
-    // Update position in DB
     await supabase.from("tasks").update({ status_id: task.status_id, position: task.position }).eq("id", activeId);
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    await supabase.from("tasks").delete().eq("id", taskId);
+    fetchData();
+    toast({ title: "Tarefa excluída" });
   };
 
   const handleAddTask = async () => {
@@ -176,6 +181,7 @@ export function KanbanBoard({ projectId }: Props) {
               tasks={filteredTasks.filter((t) => t.status_id === status.id)}
               onAddTask={(sid) => setAddingToStatus(sid)}
               onTaskClick={(t) => { setSelectedTask(t); setDetailOpen(true); }}
+              onDeleteTask={handleDeleteTask}
             />
           ))}
         </div>

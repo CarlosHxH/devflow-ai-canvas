@@ -3,7 +3,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Calendar, CheckSquare, MessageSquare } from "lucide-react";
+import { Calendar, CheckSquare, MessageSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 export interface TaskData {
   id: string;
@@ -32,9 +34,10 @@ const priorityConfig: Record<string, { label: string; className: string }> = {
 interface Props {
   task: TaskData;
   onClick: () => void;
+  onDelete?: (taskId: string) => void;
 }
 
-export function TaskCard({ task, onClick }: Props) {
+export function TaskCard({ task, onClick, onDelete }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { type: "task", task },
@@ -54,12 +57,29 @@ export function TaskCard({ task, onClick }: Props) {
       style={style}
       {...attributes}
       {...listeners}
-      className="p-3 cursor-grab active:cursor-grabbing hover:border-primary/40 transition-colors space-y-2"
+      className="p-3 cursor-grab active:cursor-grabbing hover:border-primary/40 transition-colors space-y-2 group"
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-medium leading-tight">{task.title}</span>
+        <span className="text-sm font-medium leading-tight flex-1">{task.title}</span>
         <Badge variant="outline" className={`text-[10px] shrink-0 ${prio.className}`}>{prio.label}</Badge>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+            <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity -mr-1 -mt-0.5">
+              <MoreHorizontal className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-36">
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onClick(); }}>
+              <Pencil className="h-3 w-3 mr-2" /> Editar
+            </DropdownMenuItem>
+            {onDelete && (
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}>
+                <Trash2 className="h-3 w-3 mr-2" /> Excluir
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {task.description && (
