@@ -297,8 +297,14 @@ export function KanbanBoard({ projectId }: Props) {
             )}
           </div>
         </div>
+        </SortableContext>
         <DragOverlay>
           {activeTask ? <TaskCard task={activeTask} onClick={() => {}} /> : null}
+          {activeColumn ? (
+            <div className="w-72 h-10 rounded-lg bg-muted/60 border border-primary/20 flex items-center justify-center text-sm font-semibold text-muted-foreground">
+              {activeColumn.name}
+            </div>
+          ) : null}
         </DragOverlay>
       </DndContext>
 
