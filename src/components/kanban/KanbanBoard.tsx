@@ -181,6 +181,7 @@ export function KanbanBoard({ projectId }: Props) {
               tasks={filteredTasks.filter((t) => t.status_id === status.id)}
               onAddTask={(sid) => setAddingToStatus(sid)}
               onTaskClick={(t) => { setSelectedTask(t); setDetailOpen(true); }}
+              onDeleteTask={handleDeleteTask}
             />
           ))}
         </div>
