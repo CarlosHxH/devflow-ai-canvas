@@ -45,6 +45,8 @@ export function KanbanBoard({ projectId }: Props) {
   const [filterAssignee, setFilterAssignee] = useState("all");
   const [addingToStatus, setAddingToStatus] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
+  const [deleteColumnId, setDeleteColumnId] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
