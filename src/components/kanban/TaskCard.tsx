@@ -3,7 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Calendar, CheckSquare, MessageSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarCheck2, CheckSquare, MessageSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +13,7 @@ export interface TaskData {
   description: string | null;
   priority: string;
   assignee_id: string | null;
+  start_date: string | null;
   due_date: string | null;
   position: number;
   status_id: string;
@@ -86,9 +87,21 @@ export function TaskCard({ task, onClick, onDelete }: Props) {
         <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
       )}
 
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+        {task.start_date && (
+          <span className="flex items-center gap-1" title="Início">
+            <CalendarClock className="h-3 w-3 text-primary/60" />
+            {new Date(task.start_date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+          </span>
+        )}
         {task.due_date && (
-          <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(task.due_date).toLocaleDateString("pt-BR")}</span>
+          <span className={`flex items-center gap-1 ${new Date(task.due_date) < new Date() ? "text-destructive font-medium" : ""}`} title="Prazo">
+            <CalendarCheck2 className="h-3 w-3" />
+            {new Date(task.due_date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+          </span>
+        )}
+        {(task.start_date || task.due_date) && ((task.checklist_count ?? 0) > 0 || (task.comment_count ?? 0) > 0) && (
+          <span className="text-border">·</span>
         )}
         {(task.checklist_count ?? 0) > 0 && (
           <span className="flex items-center gap-1"><CheckSquare className="h-3 w-3" />{task.checklist_done}/{task.checklist_count}</span>

@@ -48,7 +48,7 @@ export function KanbanBoard({ projectId }: Props) {
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [deleteColumnId, setDeleteColumnId] = useState<string | null>(null);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const fetchData = async () => {
     const [statusRes, taskRes] = await Promise.all([
@@ -267,7 +267,7 @@ export function KanbanBoard({ projectId }: Props) {
 
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
         <SortableContext items={statuses.map((s) => `column-${s.id}`)} strategy={horizontalListSortingStrategy}>
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex gap-4 overflow-x-auto pb-4 scroll-smooth" style={{ scrollbarGutter: "stable" }}>
             {statuses.map((status, idx) => (
               <KanbanColumn
                 key={status.id}

@@ -48,6 +48,7 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("medium");
   const [assigneeId, setAssigneeId] = useState<string>("unassigned");
+  const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [checklists, setChecklists] = useState<ChecklistItem[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -61,6 +62,7 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
       setDescription(task.description || "");
       setPriority(task.priority);
       setAssigneeId(task.assignee_id || "unassigned");
+      setStartDate(task.start_date || "");
       setDueDate(task.due_date || "");
       fetchChecklists();
       fetchComments();
@@ -92,6 +94,7 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
       description: description || null,
       priority,
       assignee_id: assigneeId === "unassigned" ? null : assigneeId,
+      start_date: startDate || null,
       due_date: dueDate || null,
     }).eq("id", task.id);
     setSaving(false);
@@ -158,7 +161,7 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
           </div>
 
           {/* Meta */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Prioridade</Label>
               <Select value={priority} onValueChange={setPriority}>
@@ -182,7 +185,11 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Data limite</Label>
+              <Label className="text-xs text-muted-foreground">Data de início</Label>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Data de finalização</Label>
               <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-8 text-xs" />
             </div>
           </div>
