@@ -94,6 +94,7 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
       description: description || null,
       priority,
       assignee_id: assigneeId === "unassigned" ? null : assigneeId,
+      start_date: startDate || null,
       due_date: dueDate || null,
     }).eq("id", task.id);
     setSaving(false);
