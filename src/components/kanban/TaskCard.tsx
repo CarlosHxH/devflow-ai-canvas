@@ -13,6 +13,7 @@ export interface TaskData {
   description: string | null;
   priority: string;
   assignee_id: string | null;
+  start_date: string | null;
   due_date: string | null;
   position: number;
   status_id: string;
