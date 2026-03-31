@@ -277,7 +277,7 @@ export function KanbanBoard({ projectId }: Props) {
                 isLast={idx === statuses.length - 1}
                 onAddTask={(sid) => setAddingToStatus(sid)}
                 onTaskClick={(t) => { setSelectedTask(t); setDetailOpen(true); }}
-                onDeleteTask={handleDeleteTask}
+                onDeleteTask={(id) => setDeleteTaskId(id)}
                 onRename={handleRenameColumn}
                 onChangeColor={handleChangeColumnColor}
                 onMove={handleMoveColumn}
