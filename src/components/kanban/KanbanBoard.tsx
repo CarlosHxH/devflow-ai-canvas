@@ -173,8 +173,10 @@ export function KanbanBoard({ projectId }: Props) {
     await supabase.from("tasks").update({ status_id: task.status_id, position: task.position }).eq("id", activeId);
   };
 
-  const handleDeleteTask = async (taskId: string) => {
-    await supabase.from("tasks").delete().eq("id", taskId);
+  const confirmDeleteTask = async () => {
+    if (!deleteTaskId) return;
+    await supabase.from("tasks").delete().eq("id", deleteTaskId);
+    setDeleteTaskId(null);
     fetchData();
     toast({ title: "Tarefa excluída" });
   };
