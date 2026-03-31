@@ -11,6 +11,7 @@ import { TaskFilters } from "./TaskFilters";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Plus } from "lucide-react";
 
@@ -44,6 +45,8 @@ export function KanbanBoard({ projectId }: Props) {
   const [filterAssignee, setFilterAssignee] = useState("all");
   const [addingToStatus, setAddingToStatus] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
+  const [deleteColumnId, setDeleteColumnId] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -172,8 +175,10 @@ export function KanbanBoard({ projectId }: Props) {
     await supabase.from("tasks").update({ status_id: task.status_id, position: task.position }).eq("id", activeId);
   };
 
-  const handleDeleteTask = async (taskId: string) => {
-    await supabase.from("tasks").delete().eq("id", taskId);
+  const confirmDeleteTask = async () => {
+    if (!deleteTaskId) return;
+    await supabase.from("tasks").delete().eq("id", deleteTaskId);
+    setDeleteTaskId(null);
     fetchData();
     toast({ title: "Tarefa excluída" });
   };
@@ -218,13 +223,19 @@ export function KanbanBoard({ projectId }: Props) {
     fetchData();
   };
 
-  const handleDeleteColumn = async (statusId: string) => {
+  const handleDeleteColumn = (statusId: string) => {
     const tasksInCol = tasks.filter((t) => t.status_id === statusId);
     if (tasksInCol.length > 0) {
       toast({ title: "Não é possível excluir", description: "Mova ou exclua as tarefas desta coluna primeiro.", variant: "destructive" });
       return;
     }
-    await supabase.from("project_statuses").delete().eq("id", statusId);
+    setDeleteColumnId(statusId);
+  };
+
+  const confirmDeleteColumn = async () => {
+    if (!deleteColumnId) return;
+    await supabase.from("project_statuses").delete().eq("id", deleteColumnId);
+    setDeleteColumnId(null);
     fetchData();
     toast({ title: "Coluna excluída" });
   };
@@ -266,7 +277,7 @@ export function KanbanBoard({ projectId }: Props) {
                 isLast={idx === statuses.length - 1}
                 onAddTask={(sid) => setAddingToStatus(sid)}
                 onTaskClick={(t) => { setSelectedTask(t); setDetailOpen(true); }}
-                onDeleteTask={handleDeleteTask}
+                onDeleteTask={(id) => setDeleteTaskId(id)}
                 onRename={handleRenameColumn}
                 onChangeColor={handleChangeColumnColor}
                 onMove={handleMoveColumn}
@@ -327,6 +338,34 @@ export function KanbanBoard({ projectId }: Props) {
         members={members}
         onUpdated={fetchData}
       />
+
+      {/* Confirm delete task */}
+      <AlertDialog open={!!deleteTaskId} onOpenChange={(o) => !o && setDeleteTaskId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação não pode ser desfeita. A tarefa e seus dados serão removidos permanentemente.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteTask} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm delete column */}
+      <AlertDialog open={!!deleteColumnId} onOpenChange={(o) => !o && setDeleteColumnId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir coluna?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação não pode ser desfeita. A coluna será removida permanentemente.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteColumn} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
