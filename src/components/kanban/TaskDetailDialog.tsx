@@ -48,6 +48,7 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("medium");
   const [assigneeId, setAssigneeId] = useState<string>("unassigned");
+  const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [checklists, setChecklists] = useState<ChecklistItem[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
