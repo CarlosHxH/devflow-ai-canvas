@@ -221,13 +221,19 @@ export function KanbanBoard({ projectId }: Props) {
     fetchData();
   };
 
-  const handleDeleteColumn = async (statusId: string) => {
+  const handleDeleteColumn = (statusId: string) => {
     const tasksInCol = tasks.filter((t) => t.status_id === statusId);
     if (tasksInCol.length > 0) {
       toast({ title: "Não é possível excluir", description: "Mova ou exclua as tarefas desta coluna primeiro.", variant: "destructive" });
       return;
     }
-    await supabase.from("project_statuses").delete().eq("id", statusId);
+    setDeleteColumnId(statusId);
+  };
+
+  const confirmDeleteColumn = async () => {
+    if (!deleteColumnId) return;
+    await supabase.from("project_statuses").delete().eq("id", deleteColumnId);
+    setDeleteColumnId(null);
     fetchData();
     toast({ title: "Coluna excluída" });
   };
