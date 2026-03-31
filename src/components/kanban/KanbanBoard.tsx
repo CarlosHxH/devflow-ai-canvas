@@ -48,7 +48,7 @@ export function KanbanBoard({ projectId }: Props) {
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [deleteColumnId, setDeleteColumnId] = useState<string | null>(null);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const fetchData = async () => {
     const [statusRes, taskRes] = await Promise.all([
