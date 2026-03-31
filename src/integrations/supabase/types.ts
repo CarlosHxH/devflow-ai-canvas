@@ -230,6 +230,7 @@ export type Database = {
           position: number
           priority: string
           project_id: string
+          start_date: string | null
           status_id: string
           title: string
           updated_at: string
@@ -244,6 +245,7 @@ export type Database = {
           position?: number
           priority?: string
           project_id: string
+          start_date?: string | null
           status_id: string
           title: string
           updated_at?: string
@@ -258,6 +260,7 @@ export type Database = {
           position?: number
           priority?: string
           project_id?: string
+          start_date?: string | null
           status_id?: string
           title?: string
           updated_at?: string
