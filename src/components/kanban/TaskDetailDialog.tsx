@@ -62,6 +62,7 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
       setDescription(task.description || "");
       setPriority(task.priority);
       setAssigneeId(task.assignee_id || "unassigned");
+      setStartDate(task.start_date || "");
       setDueDate(task.due_date || "");
       fetchChecklists();
       fetchComments();
