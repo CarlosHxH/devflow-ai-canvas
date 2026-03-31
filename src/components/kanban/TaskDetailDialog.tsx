@@ -161,7 +161,7 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
           </div>
 
           {/* Meta */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Prioridade</Label>
               <Select value={priority} onValueChange={setPriority}>
@@ -185,7 +185,11 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Data limite</Label>
+              <Label className="text-xs text-muted-foreground">Data de início</Label>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Data de finalização</Label>
               <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-8 text-xs" />
             </div>
           </div>

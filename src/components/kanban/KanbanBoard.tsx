@@ -267,7 +267,7 @@ export function KanbanBoard({ projectId }: Props) {
 
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
         <SortableContext items={statuses.map((s) => `column-${s.id}`)} strategy={horizontalListSortingStrategy}>
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex gap-4 overflow-x-auto pb-4 scroll-smooth" style={{ scrollbarGutter: "stable" }}>
             {statuses.map((status, idx) => (
               <KanbanColumn
                 key={status.id}

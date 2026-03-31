@@ -152,7 +152,7 @@ export function KanbanColumn({
 
       <div
         ref={setDroppableRef}
-        className={`flex-1 space-y-2 p-2 rounded-lg min-h-[200px] transition-colors ${isOver ? "bg-primary/5 border border-primary/20" : "bg-muted/30"}`}
+        className={`flex-1 space-y-2 p-2 rounded-lg min-h-[200px] transition-colors overflow-y-auto max-h-[calc(100vh-220px)] ${isOver ? "bg-primary/5 border border-primary/20" : "bg-muted/30"}`}
       >
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
