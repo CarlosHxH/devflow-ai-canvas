@@ -1,0 +1,1 @@
+ALTER TABLE public.checklists ADD COLUMN parent_id uuid REFERENCES public.checklists(id) ON DELETE CASCADE DEFAULT NULL;

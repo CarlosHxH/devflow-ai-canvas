@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Trash2, Plus, Send } from "lucide-react";
+import { Trash2, Plus, Send, ChevronRight, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +18,7 @@ interface ChecklistItem {
   title: string;
   completed: boolean;
   position: number;
+  parent_id: string | null;
 }
 
 interface Comment {
@@ -53,8 +54,20 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
   const [checklists, setChecklists] = useState<ChecklistItem[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newCheckItem, setNewCheckItem] = useState("");
+  const [newSubItems, setNewSubItems] = useState<Record<string, string>>({});
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [newComment, setNewComment] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const topLevelItems = useMemo(() => checklists.filter(i => !i.parent_id), [checklists]);
+  const childrenMap = useMemo(() => {
+    const map: Record<string, ChecklistItem[]> = {};
+    checklists.filter(i => i.parent_id).forEach(i => {
+      if (!map[i.parent_id!]) map[i.parent_id!] = [];
+      map[i.parent_id!].push(i);
+    });
+    return map;
+  }, [checklists]);
 
   useEffect(() => {
     if (task && open) {
@@ -110,14 +123,22 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
     toast({ title: "Tarefa excluída" });
   };
 
-  const addCheckItem = async () => {
-    if (!task || !newCheckItem.trim()) return;
+  const addCheckItem = async (parentId?: string) => {
+    const text = parentId ? newSubItems[parentId]?.trim() : newCheckItem.trim();
+    if (!task || !text) return;
+    const siblings = parentId ? (childrenMap[parentId] || []) : topLevelItems;
     await supabase.from("checklists").insert({
       task_id: task.id,
-      title: newCheckItem.trim(),
-      position: checklists.length,
-    });
-    setNewCheckItem("");
+      title: text,
+      position: siblings.length,
+      parent_id: parentId || null,
+    } as any);
+    if (parentId) {
+      setNewSubItems(prev => ({ ...prev, [parentId]: "" }));
+      setExpandedItems(prev => new Set(prev).add(parentId));
+    } else {
+      setNewCheckItem("");
+    }
     fetchChecklists();
   };
 
@@ -131,6 +152,14 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
     await supabase.from("checklists").delete().eq("id", id);
     fetchChecklists();
     onUpdated();
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   };
 
   const addComment = async () => {
@@ -206,18 +235,56 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
           {/* Checklist */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Checklist</Label>
-            {checklists.map((item) => (
-              <div key={item.id} className="flex items-center gap-2 group">
-                <Checkbox checked={item.completed} onCheckedChange={() => toggleCheckItem(item)} />
-                <span className={`text-sm flex-1 ${item.completed ? "line-through text-muted-foreground" : ""}`}>{item.title}</span>
-                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => deleteCheckItem(item.id)}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            ))}
+            {topLevelItems.map((item) => {
+              const children = childrenMap[item.id] || [];
+              const isExpanded = expandedItems.has(item.id);
+              return (
+                <div key={item.id} className="space-y-1">
+                  <div className="flex items-center gap-1 group">
+                    <button
+                      onClick={() => toggleExpand(item.id)}
+                      className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent shrink-0"
+                    >
+                      {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    </button>
+                    <Checkbox checked={item.completed} onCheckedChange={() => toggleCheckItem(item)} />
+                    <span className={`text-sm flex-1 ${item.completed ? "line-through text-muted-foreground" : ""}`}>{item.title}</span>
+                    {children.length > 0 && (
+                      <span className="text-[10px] text-muted-foreground">{children.filter(c => c.completed).length}/{children.length}</span>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => deleteCheckItem(item.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  {isExpanded && (
+                    <div className="ml-6 space-y-1 border-l border-border pl-2">
+                      {children.map((sub) => (
+                        <div key={sub.id} className="flex items-center gap-2 group/sub">
+                          <Checkbox checked={sub.completed} onCheckedChange={() => toggleCheckItem(sub)} />
+                          <span className={`text-xs flex-1 ${sub.completed ? "line-through text-muted-foreground" : ""}`}>{sub.title}</span>
+                          <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover/sub:opacity-100" onClick={() => deleteCheckItem(sub.id)}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex gap-2">
+                        <Input
+                          value={newSubItems[item.id] || ""}
+                          onChange={(e) => setNewSubItems(prev => ({ ...prev, [item.id]: e.target.value }))}
+                          placeholder="Sub-item..."
+                          className="h-7 text-xs"
+                          onKeyDown={(e) => e.key === "Enter" && addCheckItem(item.id)}
+                        />
+                        <Button size="sm" variant="ghost" onClick={() => addCheckItem(item.id)} className="h-7 px-2"><Plus className="h-3 w-3" /></Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             <div className="flex gap-2">
               <Input value={newCheckItem} onChange={(e) => setNewCheckItem(e.target.value)} placeholder="Novo item..." className="h-8 text-xs" onKeyDown={(e) => e.key === "Enter" && addCheckItem()} />
-              <Button size="sm" variant="outline" onClick={addCheckItem} className="h-8"><Plus className="h-3 w-3" /></Button>
+              <Button size="sm" variant="outline" onClick={() => addCheckItem()} className="h-8"><Plus className="h-3 w-3" /></Button>
             </div>
           </div>
 

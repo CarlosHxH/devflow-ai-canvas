@@ -60,6 +60,7 @@ export type Database = {
           completed: boolean
           created_at: string
           id: string
+          parent_id: string | null
           position: number
           task_id: string
           title: string
@@ -68,6 +69,7 @@ export type Database = {
           completed?: boolean
           created_at?: string
           id?: string
+          parent_id?: string | null
           position?: number
           task_id: string
           title: string
@@ -76,11 +78,19 @@ export type Database = {
           completed?: boolean
           created_at?: string
           id?: string
+          parent_id?: string | null
           position?: number
           task_id?: string
           title?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "checklists_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "checklists"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "checklists_task_id_fkey"
             columns: ["task_id"]
