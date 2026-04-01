@@ -123,14 +123,22 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
     toast({ title: "Tarefa excluída" });
   };
 
-  const addCheckItem = async () => {
-    if (!task || !newCheckItem.trim()) return;
+  const addCheckItem = async (parentId?: string) => {
+    const text = parentId ? newSubItems[parentId]?.trim() : newCheckItem.trim();
+    if (!task || !text) return;
+    const siblings = parentId ? (childrenMap[parentId] || []) : topLevelItems;
     await supabase.from("checklists").insert({
       task_id: task.id,
-      title: newCheckItem.trim(),
-      position: checklists.length,
-    });
-    setNewCheckItem("");
+      title: text,
+      position: siblings.length,
+      parent_id: parentId || null,
+    } as any);
+    if (parentId) {
+      setNewSubItems(prev => ({ ...prev, [parentId]: "" }));
+      setExpandedItems(prev => new Set(prev).add(parentId));
+    } else {
+      setNewCheckItem("");
+    }
     fetchChecklists();
   };
 
@@ -144,6 +152,14 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
     await supabase.from("checklists").delete().eq("id", id);
     fetchChecklists();
     onUpdated();
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   };
 
   const addComment = async () => {
