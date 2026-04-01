@@ -20,6 +20,8 @@ import ProjectWiki from "./pages/ProjectWiki";
 import ProjectDashboard from "./pages/ProjectDashboard";
 import NotFound from "./pages/NotFound";
 
+import Users from "./pages/Users";
+
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -62,6 +64,7 @@ const App = () => (
               <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/workspace/new" element={<ProtectedRoute><CreateWorkspace /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><WorkspaceSettings /></ProtectedRoute>} />
+              <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
               <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
               <Route path="/projects/:projectId/board" element={<ProtectedRoute><ProjectBoard /></ProtectedRoute>} />
               <Route path="/projects/:projectId/canvas" element={<ProtectedRoute><ProjectCanvas /></ProtectedRoute>} />

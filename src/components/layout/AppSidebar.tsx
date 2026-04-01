@@ -31,17 +31,19 @@ import {
   LogOut,
   ChevronsUpDown,
   Plus,
-} from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useWorkspace } from "@/contexts/WorkspaceContext";
+  Users,
+  } from "lucide-react";
+  import { useAuth } from "@/contexts/AuthContext";
+  import { useWorkspace } from "@/contexts/WorkspaceContext";
 
-const mainNav = [
+  const mainNav = [
   { title: "Dashboard", icon: LayoutDashboard, path: "/" },
   { title: "Projetos", icon: FolderKanban, path: "/projects" },
   { title: "Canvas", icon: PenTool, path: "/canvas" },
   { title: "Documentação", icon: BookOpen, path: "/docs" },
   { title: "Relatórios", icon: BarChart3, path: "/reports" },
-];
+  { title: "Usuários", icon: Users, path: "/users" },
+  ];
 
 export function AppSidebar() {
   const navigate = useNavigate();
