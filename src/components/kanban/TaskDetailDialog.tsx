@@ -54,8 +54,20 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
   const [checklists, setChecklists] = useState<ChecklistItem[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newCheckItem, setNewCheckItem] = useState("");
+  const [newSubItems, setNewSubItems] = useState<Record<string, string>>({});
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [newComment, setNewComment] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const topLevelItems = useMemo(() => checklists.filter(i => !i.parent_id), [checklists]);
+  const childrenMap = useMemo(() => {
+    const map: Record<string, ChecklistItem[]> = {};
+    checklists.filter(i => i.parent_id).forEach(i => {
+      if (!map[i.parent_id!]) map[i.parent_id!] = [];
+      map[i.parent_id!].push(i);
+    });
+    return map;
+  }, [checklists]);
 
   useEffect(() => {
     if (task && open) {
