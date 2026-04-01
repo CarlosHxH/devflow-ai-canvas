@@ -36,7 +36,9 @@ import {
   import { useAuth } from "@/contexts/AuthContext";
   import { useWorkspace } from "@/contexts/WorkspaceContext";
 
-  const mainNav = [
+  import { NotificationMenu } from "./NotificationMenu";
+
+const mainNav = [
   { title: "Dashboard", icon: LayoutDashboard, path: "/" },
   { title: "Projetos", icon: FolderKanban, path: "/projects" },
   { title: "Canvas", icon: PenTool, path: "/canvas" },

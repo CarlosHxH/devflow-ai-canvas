@@ -76,6 +76,7 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [newComment, setNewComment] = useState("");
   const [saving, setSaving] = useState(false);
+  const [mentionSearch, setMentionSearch] = useState<string | null>(null);
 
   const topLevelItems = useMemo(() => {
     return checklists
@@ -301,14 +302,54 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
     });
   };
 
+  const handleCommentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setNewComment(val);
+
+    const words = val.split(" ");
+    const lastWord = words[words.length - 1];
+
+    if (lastWord.startsWith("@")) {
+      setMentionSearch(lastWord.slice(1).toLowerCase());
+    } else {
+      setMentionSearch(null);
+    }
+  };
+
+  const handleMentionSelect = (member: Member) => {
+    const words = newComment.split(" ");
+    words[words.length - 1] = `@${member.name} `;
+    setNewComment(words.join(" "));
+    setMentionSearch(null);
+  };
+
   const addComment = async () => {
     if (!task || !user || !newComment.trim()) return;
+    
+    // Extrai quem foi mencionado
+    const mentionedMembers = members.filter(m => newComment.includes(`@${m.name}`) && m.id !== user.id);
+
+    // Salva o comentário
     await supabase.from("comments").insert({
       task_id: task.id,
       user_id: user.id,
       content: newComment.trim(),
     });
+
+    // Envia notificação para os mencionados
+    if (mentionedMembers.length > 0) {
+      const notifications = mentionedMembers.map(m => ({
+        user_id: m.id,
+        actor_id: user.id,
+        type: 'mention',
+        content: `mencionou você na tarefa "${task.title}"`,
+        link: `/projects/${task.project_id}/board?task=${task.id}`
+      }));
+      await supabase.from("notifications").insert(notifications);
+    }
+
     setNewComment("");
+    setMentionSearch(null);
     fetchComments();
   };
 
@@ -466,8 +507,36 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
                 </div>
               ))}
             </div>
-            <div className="flex gap-2">
-              <Input value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Comentar..." className="h-8 text-xs" onKeyDown={(e) => e.key === "Enter" && addComment()} />
+            <div className="relative flex gap-2">
+              {mentionSearch !== null && (
+                <div className="absolute bottom-10 left-0 w-64 bg-background border rounded-md shadow-md z-50 max-h-40 overflow-y-auto">
+                  {members
+                    .filter(m => m.name.toLowerCase().includes(mentionSearch) && m.id !== user?.id)
+                    .map(m => (
+                      <div
+                        key={m.id}
+                        className="px-3 py-2 text-sm cursor-pointer hover:bg-muted"
+                        onClick={() => handleMentionSelect(m)}
+                      >
+                        {m.name}
+                      </div>
+                  ))}
+                  {members.filter(m => m.name.toLowerCase().includes(mentionSearch) && m.id !== user?.id).length === 0 && (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum usuário encontrado</div>
+                  )}
+                </div>
+              )}
+              <Input 
+                value={newComment} 
+                onChange={handleCommentChange} 
+                placeholder="Comentar... (use @ para mencionar)" 
+                className="h-8 text-xs" 
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && mentionSearch === null) {
+                    addComment();
+                  }
+                }} 
+              />
               <Button size="sm" variant="outline" onClick={addComment} className="h-8"><Send className="h-3 w-3" /></Button>
             </div>
           </div>
