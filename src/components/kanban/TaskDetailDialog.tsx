@@ -235,18 +235,56 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
           {/* Checklist */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Checklist</Label>
-            {checklists.map((item) => (
-              <div key={item.id} className="flex items-center gap-2 group">
-                <Checkbox checked={item.completed} onCheckedChange={() => toggleCheckItem(item)} />
-                <span className={`text-sm flex-1 ${item.completed ? "line-through text-muted-foreground" : ""}`}>{item.title}</span>
-                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => deleteCheckItem(item.id)}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            ))}
+            {topLevelItems.map((item) => {
+              const children = childrenMap[item.id] || [];
+              const isExpanded = expandedItems.has(item.id);
+              return (
+                <div key={item.id} className="space-y-1">
+                  <div className="flex items-center gap-1 group">
+                    <button
+                      onClick={() => toggleExpand(item.id)}
+                      className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent shrink-0"
+                    >
+                      {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    </button>
+                    <Checkbox checked={item.completed} onCheckedChange={() => toggleCheckItem(item)} />
+                    <span className={`text-sm flex-1 ${item.completed ? "line-through text-muted-foreground" : ""}`}>{item.title}</span>
+                    {children.length > 0 && (
+                      <span className="text-[10px] text-muted-foreground">{children.filter(c => c.completed).length}/{children.length}</span>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => deleteCheckItem(item.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  {isExpanded && (
+                    <div className="ml-6 space-y-1 border-l border-border pl-2">
+                      {children.map((sub) => (
+                        <div key={sub.id} className="flex items-center gap-2 group/sub">
+                          <Checkbox checked={sub.completed} onCheckedChange={() => toggleCheckItem(sub)} />
+                          <span className={`text-xs flex-1 ${sub.completed ? "line-through text-muted-foreground" : ""}`}>{sub.title}</span>
+                          <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover/sub:opacity-100" onClick={() => deleteCheckItem(sub.id)}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex gap-2">
+                        <Input
+                          value={newSubItems[item.id] || ""}
+                          onChange={(e) => setNewSubItems(prev => ({ ...prev, [item.id]: e.target.value }))}
+                          placeholder="Sub-item..."
+                          className="h-7 text-xs"
+                          onKeyDown={(e) => e.key === "Enter" && addCheckItem(item.id)}
+                        />
+                        <Button size="sm" variant="ghost" onClick={() => addCheckItem(item.id)} className="h-7 px-2"><Plus className="h-3 w-3" /></Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             <div className="flex gap-2">
               <Input value={newCheckItem} onChange={(e) => setNewCheckItem(e.target.value)} placeholder="Novo item..." className="h-8 text-xs" onKeyDown={(e) => e.key === "Enter" && addCheckItem()} />
-              <Button size="sm" variant="outline" onClick={addCheckItem} className="h-8"><Plus className="h-3 w-3" /></Button>
+              <Button size="sm" variant="outline" onClick={() => addCheckItem()} className="h-8"><Plus className="h-3 w-3" /></Button>
             </div>
           </div>
 
