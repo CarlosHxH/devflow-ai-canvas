@@ -51,23 +51,52 @@ export function KanbanBoard({ projectId }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const fetchData = async () => {
-    const [statusRes, taskRes] = await Promise.all([
+    // Fetch statuses, tasks, and project's workspace_id
+    const [statusRes, taskRes, projectRes] = await Promise.all([
       supabase.from("project_statuses").select("*").eq("project_id", projectId).order("position"),
       supabase.from("tasks").select("*").eq("project_id", projectId).order("position"),
+      supabase.from("projects").select("workspace_id").eq("id", projectId).single(),
     ]);
     setStatuses(statusRes.data || []);
+
+    // Fetch workspace members (only accepted) with their profiles
+    const workspaceId = projectRes.data?.workspace_id;
+    let workspaceMembers: Member[] = [];
+    const profileMap = new Map<string, string>();
+
+    if (workspaceId) {
+      const { data: memberRows } = await supabase
+        .from("workspace_members")
+        .select("user_id")
+        .eq("workspace_id", workspaceId)
+        .eq("status", "accepted");
+
+      const memberUserIds = (memberRows || []).map((m) => m.user_id).filter(Boolean) as string[];
+
+      if (memberUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", memberUserIds);
+
+        (profiles || []).forEach((p) => {
+          profileMap.set(p.id, p.full_name || "Usuário");
+          workspaceMembers.push({ id: p.id, name: p.full_name || "Usuário" });
+        });
+      }
+    }
+
+    setMembers(workspaceMembers);
 
     // Enrich tasks with checklist counts and comments
     const rawTasks = taskRes.data || [];
     if (rawTasks.length > 0) {
       const taskIds = rawTasks.map((t) => t.id);
-      const [checkRes, commentRes, profileRes] = await Promise.all([
+      const [checkRes, commentRes] = await Promise.all([
         supabase.from("checklists").select("id, task_id, completed").in("task_id", taskIds),
         supabase.from("comments").select("id, task_id").in("task_id", taskIds),
-        supabase.from("profiles").select("id, full_name"),
       ]);
 
-      const profileMap = new Map(profileRes.data?.map((p) => [p.id, p.full_name || "Usuário"]) || []);
       const checkMap = new Map<string, { total: number; done: number }>();
       (checkRes.data || []).forEach((c) => {
         const cur = checkMap.get(c.task_id) || { total: 0, done: 0 };
@@ -85,8 +114,6 @@ export function KanbanBoard({ projectId }: Props) {
         comment_count: commentMap.get(t.id) || 0,
         assignee_name: t.assignee_id ? profileMap.get(t.assignee_id) : undefined,
       })));
-
-      setMembers(profileRes.data?.map((p) => ({ id: p.id, name: p.full_name || "Usuário" })) || []);
     } else {
       setTasks([]);
     }
