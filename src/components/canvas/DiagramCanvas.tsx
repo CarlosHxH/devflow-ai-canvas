@@ -1,44 +1,33 @@
-import { useState, useCallback, useEffect } from "react";
-import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge, Connection, Node, BackgroundVariant } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import { MermaidRenderer } from "./MermaidRenderer";
-import { AiPromptPanel } from "./AiPromptPanel";
+import { useState, useEffect } from "react";
+import { MermaidRenderer } from "@/components/canvas/MermaidRenderer";
+import { AiPromptPanel } from "@/components/canvas/AiPromptPanel";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Plus, Code, Eye } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Save, Code, Eye, ArrowRight } from "lucide-react";
+import { Excalidraw } from "@excalidraw/excalidraw";
+import { parseMermaidToExcalidraw } from "@excalidraw/mermaid-to-excalidraw";
 
 interface Props {
   projectId: string;
 }
 
-// Custom node that renders mermaid
-function MermaidNode({ data }: { data: { code: string } }) {
-  return (
-    <div className="bg-card border rounded-lg p-4 min-w-[300px] max-w-[600px] shadow-lg">
-      <MermaidRenderer code={data.code} />
-    </div>
-  );
-}
-
-const nodeTypes = { mermaid: MermaidNode };
-
 export function DiagramCanvas({ projectId }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
   const [mermaidCode, setMermaidCode] = useState("graph TD\n  A[Início] --> B[Processo]\n  B --> C{Decisão}\n  C -->|Sim| D[Resultado A]\n  C -->|Não| E[Resultado B]");
   const [canvasId, setCanvasId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"code" | "preview">("preview");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadCanvas();
-  }, [projectId]);
+    if (excalidrawAPI) {
+      loadCanvas();
+    }
+  }, [projectId, excalidrawAPI]);
 
   const loadCanvas = async () => {
     const { data } = await supabase
@@ -52,30 +41,55 @@ export function DiagramCanvas({ projectId }: Props) {
       const canvas = data[0];
       setCanvasId(canvas.id);
       if (canvas.mermaid_code) setMermaidCode(canvas.mermaid_code);
-      if (canvas.react_flow_data) {
+      if (canvas.react_flow_data && (canvas.react_flow_data as any).elements) {
         const flowData = canvas.react_flow_data as any;
-        if (flowData.nodes) setNodes(flowData.nodes);
-        if (flowData.edges) setEdges(flowData.edges);
+        excalidrawAPI.updateScene({
+          elements: flowData.elements || [],
+          appState: flowData.appState || {}
+        });
       }
     }
   };
 
-  const onConnect = useCallback((params: Connection) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
-
-  const addMermaidNode = () => {
-    const newNode: Node = {
-      id: `mermaid-${Date.now()}`,
-      type: "mermaid",
-      position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 },
-      data: { code: mermaidCode },
-    };
-    setNodes((nds) => [...nds, newNode]);
+  const insertMermaidToExcalidraw = async (code: string) => {
+    if (!excalidrawAPI) return;
+    try {
+      const { elements } = await parseMermaidToExcalidraw(code, {
+        fontSize: 20,
+      });
+      // Recupera elementos atuais
+      const currentElements = excalidrawAPI.getSceneElements();
+      // Move os novos elementos pra direita
+      const offsetX = 50;
+      const offsetY = 50;
+      const positionedElements = elements.map(el => ({
+        ...el,
+        x: el.x + offsetX,
+        y: el.y + offsetY
+      }));
+      excalidrawAPI.updateScene({ elements: [...currentElements, ...positionedElements] });
+    } catch (e) {
+      console.error("Error parsing mermaid to excalidraw", e);
+      toast({ title: "Erro na conversão", description: "Não foi possível enviar o gráfico para o canvas", variant: "destructive" });
+    }
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !excalidrawAPI) return;
     setSaving(true);
-    const flowData = { nodes, edges };
+    
+    const elements = excalidrawAPI.getSceneElements();
+    const appState = excalidrawAPI.getAppState();
+    
+    // Filtramos o appState para não salvar dados gigantes ou transientes
+    const flowData = { 
+      elements, 
+      appState: {
+        viewBackgroundColor: appState.viewBackgroundColor,
+        currentItemFontFamily: appState.currentItemFontFamily,
+        theme: appState.theme
+      } 
+    };
 
     if (canvasId) {
       await supabase.from("canvases").update({
@@ -85,7 +99,7 @@ export function DiagramCanvas({ projectId }: Props) {
     } else {
       const { data } = await supabase.from("canvases").insert({
         project_id: projectId,
-        name: "Canvas Principal",
+        name: "Canvas Excalidraw",
         mermaid_code: mermaidCode,
         react_flow_data: flowData as any,
         created_by: user.id,
@@ -93,19 +107,16 @@ export function DiagramCanvas({ projectId }: Props) {
       if (data) setCanvasId(data.id);
     }
     setSaving(false);
-    toast({ title: "Canvas salvo!" });
+    toast({ title: "Quadro salvo com sucesso!" });
   };
 
   const handleAiGenerated = (code: string) => {
     setMermaidCode(code);
-    // Also add as a node on the canvas
-    const newNode: Node = {
-      id: `mermaid-${Date.now()}`,
-      type: "mermaid",
-      position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 },
-      data: { code },
-    };
-    setNodes((nds) => [...nds, newNode]);
+    insertMermaidToExcalidraw(code);
+  };
+
+  const handleInsertManual = () => {
+    insertMermaidToExcalidraw(mermaidCode);
   };
 
   return (
@@ -141,33 +152,39 @@ export function DiagramCanvas({ projectId }: Props) {
           )}
 
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={addMermaidNode} className="flex-1">
-              <Plus className="h-3 w-3 mr-1" /> Ao Canvas
+            <Button size="sm" variant="outline" onClick={handleInsertManual} className="flex-1">
+              <ArrowRight className="h-3 w-3 mr-1" /> Ao Quadro
             </Button>
-            <Button size="sm" onClick={handleSave} disabled={saving} className="flex-1 gradient-primary">
+            <Button size="sm" onClick={handleSave} disabled={saving} className="flex-1 gradient-primary">     
               <Save className="h-3 w-3 mr-1" /> {saving ? "Salvando..." : "Salvar"}
             </Button>
           </div>
+          <p className="text-[10px] text-muted-foreground mt-2 text-center">
+            Diagramas Mermaid e telas da IA são convertidos para desenho livre!
+          </p>
         </div>
       </div>
 
-      {/* Canvas */}
-      <div className="flex-1 border rounded-lg overflow-hidden">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          nodeTypes={nodeTypes}
-          fitView
-          className="bg-background"
-        >
-          <Background variant={BackgroundVariant.Dots} gap={20} size={1} className="opacity-30" />
-          <Controls className="[&_button]:bg-card [&_button]:border-border" />
-          <MiniMap className="bg-card border border-border" />
-        </ReactFlow>
+      {/* Canvas - Excalidraw */}
+      <div className="flex-1 relative border rounded-lg overflow-hidden bg-background" style={{ height: "100%", width: "100%" }}>
+        <Excalidraw 
+          excalidrawAPI={(api) => setExcalidrawAPI(api)} 
+          langCode="pt-BR"
+          UIOptions={{
+            canvasActions: {
+              toggleTheme: true,
+              export: { saveFileToDisk: true },
+              saveAsImage: true,
+              clearCanvas: true,
+              loadScene: false
+            }
+          }}
+        />
       </div>
     </div>
   );
 }
+
+
+
+
