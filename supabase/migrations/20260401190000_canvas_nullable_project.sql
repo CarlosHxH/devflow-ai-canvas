@@ -1,0 +1,1 @@
+ALTER TABLE public.canvases ALTER COLUMN project_id DROP NOT NULL;
