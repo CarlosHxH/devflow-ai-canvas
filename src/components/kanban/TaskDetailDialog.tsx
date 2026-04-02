@@ -345,7 +345,7 @@ export function TaskDetailDialog({ task, open, onOpenChange, members, onUpdated 
         content: `mencionou você na tarefa "${task.title}"`,
         link: `/projects/${task.project_id}/board?task=${task.id}`
       }));
-      await supabase.from("notifications").insert(notifications);
+      await (supabase as any).from("notifications").insert(notifications);
     }
 
     setNewComment("");

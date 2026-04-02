@@ -65,7 +65,7 @@ export function NotificationMenu() {
 
   const markAllAsRead = async () => {
     if (!user) return;
-    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
+    await (supabase as any).from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
     fetchNotifications();
   };
 
