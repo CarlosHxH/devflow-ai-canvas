@@ -41,7 +41,7 @@ export function NotificationMenu() {
 
   const fetchNotifications = async () => {
     if (!user) return;
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from("notifications")
       .select(`
         *,
