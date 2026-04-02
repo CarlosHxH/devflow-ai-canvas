@@ -5,6 +5,7 @@ import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -90,6 +91,7 @@ async function mermaidToImageElement(
 
 export function ExcalidrawCanvas({ projectId }: Props) {
   const { user } = useAuth();
+  const { currentWorkspace } = useWorkspace();
   const { toast } = useToast();
   const [canvasId, setCanvasId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -111,18 +113,19 @@ export function ExcalidrawCanvas({ projectId }: Props) {
   const isRemoteUpdate = useRef(false);
 
   useEffect(() => {
-    if (projectId) {
+    if (projectId || currentWorkspace) {
       loadCanvas();
-    } else {
+    } else if (!projectId && !currentWorkspace) {
       setLoaded(true);
     }
-  }, [projectId]);
+  }, [projectId, currentWorkspace]);
 
   // Realtime collaboration
   useEffect(() => {
-    if (!projectId || !user) return;
+    const contextId = projectId || currentWorkspace?.id;
+    if (!contextId || !user) return;
 
-    const channelName = `canvas:${projectId}`;
+    const channelName = `canvas:${contextId}`;
     const channel = supabase.channel(channelName, {
       config: { broadcast: { self: false } },
     });
@@ -136,23 +139,20 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         isRemoteUpdate.current = true;
         apiRef.current.updateScene({ elements });
         if (files) {
-          // Add received files
-          Object.entries(files).forEach(([id, file]: [string, any]) => {
-            apiRef.current?.addFiles([file]);
-          });
+          apiRef.current?.addFiles(Object.values(files));
         }
         setTimeout(() => { isRemoteUpdate.current = false; }, 100);
       })
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
         const users = Object.values(state).flat().map((p: any) => p.name).filter(Boolean);
-        setCollaborators(users);
+        setCollaborators(users.filter(u => u !== (user.user_metadata?.full_name || user.email)));
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await channel.track({
             user_id: user.id,
-            name: user.email || "Anônimo",
+            name: user.user_metadata?.full_name || user.email || "Anônimo",
             online_at: new Date().toISOString(),
           });
         }
@@ -164,16 +164,21 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [projectId, user]);
+  }, [projectId, currentWorkspace, user]);
 
   const loadCanvas = async () => {
-    if (!projectId) { setLoaded(true); return; }
-    const { data } = await supabase
-      .from("canvases")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: true })
-      .limit(1);
+    const query = supabase.from("canvases").select("*");
+    
+    if (projectId) {
+      query.eq("project_id", projectId);
+    } else if (currentWorkspace) {
+      query.eq("workspace_id", currentWorkspace.id).is("project_id", null);
+    } else {
+      setLoaded(true);
+      return;
+    }
+
+    const { data } = await query.order("created_at", { ascending: true }).limit(1);
 
     if (data && data.length > 0) {
       const canvas = data[0];
@@ -183,10 +188,16 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         if (flowData.elements) {
           setInitialData({
             elements: flowData.elements,
-            appState: { ...flowData.appState, collaborators: new Map() },
+            appState: { 
+              ...flowData.appState,
+              theme: "dark",
+            },
           });
         }
       }
+    } else {
+      setInitialData(null);
+      setCanvasId(null);
     }
     setLoaded(true);
   };
@@ -208,13 +219,13 @@ export function ExcalidrawCanvas({ projectId }: Props) {
     (elements: readonly ExcalidrawElement[], appState: AppState, files: BinaryFiles) => {
       if (isRemoteUpdate.current) return;
       if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
-      broadcastTimerRef.current = setTimeout(broadcastScene, 300);
+      broadcastTimerRef.current = setTimeout(broadcastScene, 200);
     },
     [broadcastScene]
   );
 
   const handleSave = async () => {
-    if (!user || !projectId || !apiRef.current) return;
+    if (!user || (!projectId && !currentWorkspace) || !apiRef.current) return;
     setSaving(true);
 
     const elements = apiRef.current.getSceneElements();
@@ -234,12 +245,19 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         react_flow_data: saveData as any,
       }).eq("id", canvasId);
     } else {
-      const { data } = await supabase.from("canvases").insert({
-        project_id: projectId,
-        name: "Canvas Principal",
+      const insertData: any = {
+        name: projectId ? "Project Canvas" : "Workspace Canvas",
         react_flow_data: saveData as any,
         created_by: user.id,
-      }).select("id").single();
+      };
+      
+      if (projectId) {
+        insertData.project_id = projectId;
+      } else {
+        insertData.workspace_id = currentWorkspace?.id;
+      }
+
+      const { data } = await supabase.from("canvases").insert(insertData).select("id").single();
       if (data) setCanvasId(data.id);
     }
     setSaving(false);
@@ -279,14 +297,12 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       const result = await mermaidToImageElement(data.mermaid_code);
       if (!result) throw new Error("Erro ao renderizar diagrama");
 
-      // Get current viewport center
       const appState = apiRef.current.getAppState();
       const centerX = -appState.scrollX + (window.innerWidth / 2 / appState.zoom.value) - result.element.width / 2;
       const centerY = -appState.scrollY + (window.innerHeight / 2 / appState.zoom.value) - result.element.height / 2;
       result.element.x = centerX;
       result.element.y = centerY;
 
-      // Add file and element to scene
       apiRef.current.addFiles([result.file as any]);
       const currentElements = apiRef.current.getSceneElements();
       apiRef.current.updateScene({
@@ -296,8 +312,6 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       toast({ title: "Diagrama inserido no canvas!" });
       setAiPrompt("");
       setShowAiPanel(false);
-
-      // Broadcast the update
       setTimeout(broadcastScene, 200);
     } catch (e: any) {
       toast({ title: "Erro ao gerar diagrama", description: e.message, variant: "destructive" });
@@ -316,13 +330,11 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
   return (
     <div className="relative h-[calc(100vh-8rem)] border rounded-lg overflow-hidden">
-      {/* Toolbar */}
       <div className="absolute top-3 right-3 z-10 flex gap-2">
-        {/* Collaborators indicator */}
         {collaborators.length > 0 && (
           <div className="flex items-center gap-1 bg-card/90 backdrop-blur-sm border rounded-md px-2 py-1 shadow-lg">
             <Users className="h-3 w-3 text-emerald-500" />
-            <span className="text-xs text-muted-foreground">{collaborators.length + 1} online</span>
+            <span className="text-xs text-muted-foreground">{collaborators.length} outro(s) online</span>
           </div>
         )}
 
@@ -335,7 +347,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
           <Sparkles className="h-3 w-3 mr-1" /> IA
         </Button>
 
-        {projectId && (
+        {(projectId || currentWorkspace) && (
           <Button size="sm" onClick={handleSave} disabled={saving} className="gradient-primary shadow-lg">
             {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
             {saving ? "Salvando..." : "Salvar"}
@@ -346,7 +358,6 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         </Button>
       </div>
 
-      {/* AI Prompt Panel */}
       {showAiPanel && (
         <div className="absolute top-14 right-3 z-10 w-80 bg-card/95 backdrop-blur-sm border rounded-lg shadow-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
@@ -361,7 +372,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
           <Textarea
             value={aiPrompt}
             onChange={(e) => setAiPrompt(e.target.value)}
-            placeholder="Descreva o diagrama... Ex: 'Fluxo de autenticação com login e signup'"
+            placeholder="Descreva o diagrama..."
             className="min-h-[80px] resize-none text-sm"
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAiGenerate();
@@ -376,9 +387,6 @@ export function ExcalidrawCanvas({ projectId }: Props) {
             {aiLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
             {aiLoading ? "Gerando..." : "Inserir no Canvas"}
           </Button>
-          <p className="text-xs text-muted-foreground">
-            Ctrl+Enter para gerar. O diagrama será inserido como imagem no canvas.
-          </p>
         </div>
       )}
 
