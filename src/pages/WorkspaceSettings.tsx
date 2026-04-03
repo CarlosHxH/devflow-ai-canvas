@@ -109,7 +109,6 @@ export default function WorkspaceSettings() {
     toast.success("Chave da API salva");
     setSavingApiKey(false);
   };
-  };
 
   // ---- General ----
   const handleRenameWorkspace = async () => {
