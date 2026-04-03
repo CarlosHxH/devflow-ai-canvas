@@ -153,11 +153,11 @@ export function ExcalidrawCanvas({ projectId }: Props) {
     channel
       .on("broadcast", { event: "scene-update" }, (payload: any) => {
         if (!apiRef.current) return;
-        const { elements, files, senderId } = payload.payload;
+        const { elements, files, appState, senderId } = payload.payload;
         if (senderId === user.id) return;
 
         isRemoteUpdate.current = true;
-        apiRef.current.updateScene({ elements });
+        apiRef.current.updateScene({ elements, appState });
         if (files) {
           apiRef.current?.addFiles(Object.values(files));
         }
@@ -233,10 +233,20 @@ export function ExcalidrawCanvas({ projectId }: Props) {
     if (!channelRef.current || !apiRef.current || isRemoteUpdate.current || !user) return;
     const elements = apiRef.current.getSceneElements();
     const files = apiRef.current.getFiles();
+    const appState = apiRef.current.getAppState();
+    const collaborativeAppState = {
+      viewBackgroundColor: appState.viewBackgroundColor,
+      zoom: appState.zoom,
+      scrollX: appState.scrollX,
+      scrollY: appState.scrollY,
+      zenMode: appState.zenMode,
+      gridMode: appState.gridMode,
+      viewMode: appState.viewMode,
+    };
     channelRef.current.send({
       type: "broadcast",
       event: "scene-update",
-      payload: { elements, files, senderId: user.id },
+      payload: { elements, files, appState: collaborativeAppState, senderId: user.id },
     });
   }, [user]);
 
