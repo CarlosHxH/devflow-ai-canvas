@@ -237,8 +237,10 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
     const elements = apiRef.current.getSceneElements();
     const appState = apiRef.current.getAppState();
+    const files = apiRef.current.getFiles();
     const saveData = {
       elements,
+      files,
       appState: {
         viewBackgroundColor: appState.viewBackgroundColor,
         zoom: appState.zoom,
