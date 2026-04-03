@@ -5,13 +5,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT = `You are a Mermaid.js diagram expert. Given a user description, generate ONLY valid Mermaid.js code. 
+const SYSTEM_PROMPT = `You are a Mermaid.js diagram expert.
 Rules:
-- Output ONLY the Mermaid code, no markdown fences, no explanations
-- Use Portuguese for labels when the user writes in Portuguese
-- Support: graph/flowchart, sequence, class, state, ER, gantt, pie, mindmap
-- Keep diagrams clean and readable
-- Use proper Mermaid syntax`;
+- Generate ONLY valid Mermaid.js code.
+- Be concise: use short labels for nodes.
+- Do NOT use subgraphs unless strictly necessary.
+- Output ONLY the raw code.`;
+
+// const SYSTEM_PROMPT = `You are a Mermaid.js diagram expert. Given a user description, generate ONLY valid Mermaid.js code. 
+// Rules:
+// - Output ONLY the Mermaid code, no markdown fences, no explanations
+// - Use Portuguese for labels when the user writes in Portuguese
+// - Support: graph/flowchart, sequence, class, state, ER, gantt, pie, mindmap
+// - Keep diagrams clean and readable
+// - Use proper Mermaid syntax`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
