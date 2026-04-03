@@ -106,6 +106,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [userGeminiKey, setUserGeminiKey] = useState<string | null>(null);
 
   // Realtime state
   const [collaborators, setCollaborators] = useState<string[]>([]);
