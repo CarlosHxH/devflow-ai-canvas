@@ -311,7 +311,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
     setAiLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("generate-diagram", {
-        body: { prompt: aiPrompt.trim() },
+        body: { prompt: aiPrompt.trim(), gemini_api_key: userGeminiKey || undefined },
       });
       if (error) throw error;
       if (!data?.mermaid_code) throw new Error("Sem código Mermaid na resposta");
