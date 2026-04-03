@@ -21,9 +21,10 @@ export type Database = {
           id: string
           mermaid_code: string | null
           name: string
-          project_id: string
+          project_id: string | null
           react_flow_data: Json | null
           updated_at: string
+          workspace_id: string | null
         }
         Insert: {
           created_at?: string
@@ -31,9 +32,10 @@ export type Database = {
           id?: string
           mermaid_code?: string | null
           name?: string
-          project_id: string
+          project_id?: string | null
           react_flow_data?: Json | null
           updated_at?: string
+          workspace_id?: string | null
         }
         Update: {
           created_at?: string
@@ -41,9 +43,10 @@ export type Database = {
           id?: string
           mermaid_code?: string | null
           name?: string
-          project_id?: string
+          project_id?: string | null
           react_flow_data?: Json | null
           updated_at?: string
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -51,6 +54,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvases_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
