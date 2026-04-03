@@ -416,6 +416,55 @@ export default function WorkspaceSettings() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* ========== API KEYS ========== */}
+          <TabsContent value="apikeys" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" /> Chave da API Gemini</CardTitle>
+                <CardDescription>
+                  Configure sua chave da API do Google Gemini para gerar diagramas com IA no Canvas.
+                  Obtenha uma chave em{" "}
+                  <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                    Google AI Studio
+                  </a>.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="gemini-key">API Key</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="gemini-key"
+                        type={showApiKey ? "text" : "password"}
+                        value={geminiApiKey}
+                        onChange={(e) => setGeminiApiKey(e.target.value)}
+                        placeholder="AIza..."
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                      >
+                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <Button onClick={handleSaveApiKey} disabled={savingApiKey}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {savingApiKey ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Sua chave é armazenada de forma segura e usada apenas para chamadas à API Gemini.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </AppLayout>
