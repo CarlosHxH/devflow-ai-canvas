@@ -106,6 +106,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [userGeminiKey, setUserGeminiKey] = useState<string | null>(null);
 
   // Realtime state
   const [collaborators, setCollaborators] = useState<string[]>([]);
@@ -119,6 +120,18 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       setLoaded(true);
     }
   }, [projectId, currentWorkspace]);
+
+  // Fetch user's Gemini API key
+  useEffect(() => {
+    if (!user) return;
+    (supabase.from("user_settings") as any)
+      .select("gemini_api_key")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }: any) => {
+        if (data?.gemini_api_key) setUserGeminiKey(data.gemini_api_key);
+      });
+  }, [user]);
 
   // Realtime collaboration
   useEffect(() => {
@@ -298,7 +311,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
     setAiLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("generate-diagram", {
-        body: { prompt: aiPrompt.trim() },
+        body: { prompt: aiPrompt.trim(), gemini_api_key: userGeminiKey || undefined },
       });
       if (error) throw error;
       if (!data?.mermaid_code) throw new Error("Sem código Mermaid na resposta");

@@ -7,7 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { UserPlus, Mail, Trash2, Shield, Building2, User, Crown, Save } from "lucide-react";
+import { UserPlus, Mail, Trash2, Shield, Building2, User, Crown, Save, Key, Eye, EyeOff } from "lucide-react";
 
 interface Member {
   id: string;
@@ -51,6 +50,12 @@ export default function WorkspaceSettings() {
   const [profile, setProfile] = useState<Profile>({ full_name: "", avatar_url: "" });
   const [savingProfile, setSavingProfile] = useState(false);
 
+  // API Key tab
+  const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [savingApiKey, setSavingApiKey] = useState(false);
+  const [apiKeyLoaded, setApiKeyLoaded] = useState(false);
+
   const isOwner = currentWorkspace?.created_by === user?.id;
 
   useEffect(() => {
@@ -61,7 +66,10 @@ export default function WorkspaceSettings() {
   }, [currentWorkspace]);
 
   useEffect(() => {
-    if (user) fetchProfile();
+    if (user) {
+      fetchProfile();
+      fetchApiKey();
+    }
   }, [user]);
 
   // ---- Fetch ----
@@ -80,6 +88,27 @@ export default function WorkspaceSettings() {
     if (!user) return;
     const { data } = await supabase.from("profiles").select("full_name, avatar_url").eq("id", user.id).single();
     if (data) setProfile({ full_name: data.full_name || "", avatar_url: data.avatar_url || "" });
+  };
+
+  const fetchApiKey = async () => {
+    if (!user) return;
+    const { data } = await (supabase.from("user_settings") as any).select("gemini_api_key").eq("user_id", user.id).maybeSingle();
+    if (data?.gemini_api_key) setGeminiApiKey(data.gemini_api_key);
+    setApiKeyLoaded(true);
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!user) return;
+    setSavingApiKey(true);
+    const { data: existing } = await (supabase.from("user_settings") as any).select("id").eq("user_id", user.id).maybeSingle();
+    if (existing) {
+      await (supabase.from("user_settings") as any).update({ gemini_api_key: geminiApiKey || null }).eq("user_id", user.id);
+    } else {
+      await (supabase.from("user_settings") as any).insert({ user_id: user.id, gemini_api_key: geminiApiKey || null });
+    }
+    toast.success("Chave da API salva");
+    setSavingApiKey(false);
+  };
   };
 
   // ---- General ----
@@ -153,10 +182,11 @@ export default function WorkspaceSettings() {
     <AppLayout title="Configurações">
       <div className="max-w-3xl space-y-6 animate-fade-in">
         <Tabs defaultValue="general" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="general" className="gap-2"><Building2 className="h-4 w-4" /> Workspace</TabsTrigger>
             <TabsTrigger value="members" className="gap-2"><UserPlus className="h-4 w-4" /> Membros</TabsTrigger>
             <TabsTrigger value="profile" className="gap-2"><User className="h-4 w-4" /> Meu Perfil</TabsTrigger>
+            <TabsTrigger value="apikeys" className="gap-2"><Key className="h-4 w-4" /> API Keys</TabsTrigger>
           </TabsList>
 
           {/* ========== GENERAL ========== */}
@@ -383,6 +413,55 @@ export default function WorkspaceSettings() {
                   <Save className="h-4 w-4 mr-2" />
                   {savingProfile ? "Salvando..." : "Salvar perfil"}
                 </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ========== API KEYS ========== */}
+          <TabsContent value="apikeys" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" /> Chave da API Gemini</CardTitle>
+                <CardDescription>
+                  Configure sua chave da API do Google Gemini para gerar diagramas com IA no Canvas.
+                  Obtenha uma chave em{" "}
+                  <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                    Google AI Studio
+                  </a>.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="gemini-key">API Key</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="gemini-key"
+                        type={showApiKey ? "text" : "password"}
+                        value={geminiApiKey}
+                        onChange={(e) => setGeminiApiKey(e.target.value)}
+                        placeholder="AIza..."
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                      >
+                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <Button onClick={handleSaveApiKey} disabled={savingApiKey}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {savingApiKey ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Sua chave é armazenada de forma segura e usada apenas para chamadas à API Gemini.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
