@@ -24,7 +24,7 @@ function generateId() {
 
 async function mermaidToImageElement(
   code: string
-): Promise<{ element: any; fileId: string; file: { mimeType: string; id: string; dataURL: string; created: number } } | null> {
+): Promise<{ element: ExcalidrawElement; fileId: string; file: { mimeType: string; id: string; dataURL: string; created: number } } | null> {
   try {
     const id = `mermaid-render-${Date.now()}`;
     const { svg: svgStr } = await mermaid.render(id, code.trim());
@@ -117,7 +117,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
   // Realtime state
   const [collaborators, setCollaborators] = useState<string[]>([]);
-  const channelRef = useRef<any>(null);
+  const channelRef = useRef<SupabaseChannel>(null);
   const isRemoteUpdate = useRef(false);
 
   useEffect(() => {
