@@ -66,7 +66,10 @@ export default function WorkspaceSettings() {
   }, [currentWorkspace]);
 
   useEffect(() => {
-    if (user) fetchProfile();
+    if (user) {
+      fetchProfile();
+      fetchApiKey();
+    }
   }, [user]);
 
   // ---- Fetch ----
