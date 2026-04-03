@@ -50,6 +50,12 @@ export default function WorkspaceSettings() {
   const [profile, setProfile] = useState<Profile>({ full_name: "", avatar_url: "" });
   const [savingProfile, setSavingProfile] = useState(false);
 
+  // API Key tab
+  const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [savingApiKey, setSavingApiKey] = useState(false);
+  const [apiKeyLoaded, setApiKeyLoaded] = useState(false);
+
   const isOwner = currentWorkspace?.created_by === user?.id;
 
   useEffect(() => {
