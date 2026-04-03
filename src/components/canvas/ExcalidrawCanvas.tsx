@@ -29,16 +29,23 @@ async function mermaidToImageElement(
     const id = `mermaid-render-${Date.now()}`;
     const { svg: svgStr } = await mermaid.render(id, code.trim());
 
-    // Convert SVG string to a blob then to data URL
-    const svgBlob = new Blob([svgStr], { type: "image/svg+xml" });
-    const bitmap = await createImageBitmap(svgBlob);
+    // Convert SVG string to a data URL, load in <img>, then draw to canvas
+    const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgStr)}`;
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = (e) => reject(new Error("Failed to load SVG image"));
+      image.src = svgDataUrl;
+    });
+    const imgWidth = img.naturalWidth || 800;
+    const imgHeight = img.naturalHeight || 600;
     const canvas = document.createElement("canvas");
     const scale = 2;
-    canvas.width = bitmap.width * scale;
-    canvas.height = bitmap.height * scale;
+    canvas.width = imgWidth * scale;
+    canvas.height = imgHeight * scale;
     const ctx = canvas.getContext("2d")!;
     ctx.scale(scale, scale);
-    ctx.drawImage(bitmap, 0, 0);
+    ctx.drawImage(img, 0, 0);
     const dataURL = canvas.toDataURL("image/png");
 
     const fileId = generateId();
