@@ -90,6 +90,27 @@ export default function WorkspaceSettings() {
     if (data) setProfile({ full_name: data.full_name || "", avatar_url: data.avatar_url || "" });
   };
 
+  const fetchApiKey = async () => {
+    if (!user) return;
+    const { data } = await (supabase.from("user_settings") as any).select("gemini_api_key").eq("user_id", user.id).maybeSingle();
+    if (data?.gemini_api_key) setGeminiApiKey(data.gemini_api_key);
+    setApiKeyLoaded(true);
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!user) return;
+    setSavingApiKey(true);
+    const { data: existing } = await (supabase.from("user_settings") as any).select("id").eq("user_id", user.id).maybeSingle();
+    if (existing) {
+      await (supabase.from("user_settings") as any).update({ gemini_api_key: geminiApiKey || null }).eq("user_id", user.id);
+    } else {
+      await (supabase.from("user_settings") as any).insert({ user_id: user.id, gemini_api_key: geminiApiKey || null });
+    }
+    toast.success("Chave da API salva");
+    setSavingApiKey(false);
+  };
+  };
+
   // ---- General ----
   const handleRenameWorkspace = async () => {
     if (!currentWorkspace || !wsName.trim()) return;
