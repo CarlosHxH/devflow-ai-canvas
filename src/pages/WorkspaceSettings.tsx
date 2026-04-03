@@ -182,10 +182,11 @@ export default function WorkspaceSettings() {
     <AppLayout title="Configurações">
       <div className="max-w-3xl space-y-6 animate-fade-in">
         <Tabs defaultValue="general" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="general" className="gap-2"><Building2 className="h-4 w-4" /> Workspace</TabsTrigger>
             <TabsTrigger value="members" className="gap-2"><UserPlus className="h-4 w-4" /> Membros</TabsTrigger>
             <TabsTrigger value="profile" className="gap-2"><User className="h-4 w-4" /> Meu Perfil</TabsTrigger>
+            <TabsTrigger value="apikeys" className="gap-2"><Key className="h-4 w-4" /> API Keys</TabsTrigger>
           </TabsList>
 
           {/* ========== GENERAL ========== */}
