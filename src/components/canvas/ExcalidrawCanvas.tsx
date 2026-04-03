@@ -121,6 +121,18 @@ export function ExcalidrawCanvas({ projectId }: Props) {
     }
   }, [projectId, currentWorkspace]);
 
+  // Fetch user's Gemini API key
+  useEffect(() => {
+    if (!user) return;
+    (supabase.from("user_settings") as any)
+      .select("gemini_api_key")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }: any) => {
+        if (data?.gemini_api_key) setUserGeminiKey(data.gemini_api_key);
+      });
+  }, [user]);
+
   // Realtime collaboration
   useEffect(() => {
     const contextId = projectId || currentWorkspace?.id;
