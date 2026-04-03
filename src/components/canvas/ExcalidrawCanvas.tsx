@@ -167,7 +167,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
   }, [projectId, currentWorkspace, user]);
 
   const loadCanvas = async () => {
-    const query = supabase.from("canvases").select("*");
+    const query = supabase.from("canvases").select("*") as any;
     
     if (projectId) {
       query.eq("project_id", projectId);
@@ -186,6 +186,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       if (canvas.react_flow_data) {
         const flowData = canvas.react_flow_data as any;
         if (flowData.elements) {
+          const files = flowData.files || {};
           setInitialData({
             elements: flowData.elements,
             appState: { 
@@ -193,6 +194,12 @@ export function ExcalidrawCanvas({ projectId }: Props) {
               theme: "dark",
             },
           });
+          // Restore files after mount
+          setTimeout(() => {
+            if (apiRef.current && Object.keys(files).length > 0) {
+              apiRef.current.addFiles(Object.values(files));
+            }
+          }, 500);
         }
       }
     } else {
