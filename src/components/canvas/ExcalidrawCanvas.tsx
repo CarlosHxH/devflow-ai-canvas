@@ -276,6 +276,9 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         zoom: appState.zoom,
         scrollX: appState.scrollX,
         scrollY: appState.scrollY,
+        zenMode: appState.zenMode,
+        gridMode: appState.gridMode,
+        viewMode: appState.viewMode,
       },
     };
 
