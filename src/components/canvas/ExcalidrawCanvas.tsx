@@ -25,7 +25,7 @@ function generateId() {
 
 async function mermaidToImageElement(
   code: string
-): Promise<{ element: ExcalidrawElement; fileId: string; file: { mimeType: string; id: string; dataURL: string; created: number } } | null> {
+): Promise<{ element: any; fileId: string; file: { mimeType: string; id: string; dataURL: string; created: number } } | null> {
   try {
     const id = `mermaid-render-${Date.now()}`;
     const { svg: svgStr } = await mermaid.render(id, code.trim());
