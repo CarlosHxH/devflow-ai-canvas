@@ -3,6 +3,7 @@ import { Excalidraw, exportToBlob } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -29,14 +30,14 @@ async function mermaidToImageElement(
     const id = `mermaid-render-${Date.now()}`;
     const { svg: svgStr } = await mermaid.render(id, code.trim());
 
-    // Convert SVG string to a data URL, load in <img>, then draw to canvas
     const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgStr)}`;
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image();
       image.onload = () => resolve(image);
-      image.onerror = (e) => reject(new Error("Failed to load SVG image"));
+      image.onerror = () => reject(new Error("Failed to load SVG image"));
       image.src = svgDataUrl;
     });
+
     const imgWidth = img.naturalWidth || 800;
     const imgHeight = img.naturalHeight || 600;
     const canvas = document.createElement("canvas");
@@ -100,6 +101,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
   const { user } = useAuth();
   const { currentWorkspace } = useWorkspace();
   const { toast } = useToast();
+
   const [canvasId, setCanvasId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [initialData, setInitialData] = useState<{
@@ -117,13 +119,15 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
   // Realtime state
   const [collaborators, setCollaborators] = useState<string[]>([]);
-  const channelRef = useRef<SupabaseChannel>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);       // ✅ tipo correto
+  const channelStatusRef = useRef<string>("");                    // ✅ rastreia status
   const isRemoteUpdate = useRef(false);
+  const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (projectId || currentWorkspace) {
       loadCanvas();
-    } else if (!projectId && !currentWorkspace) {
+    } else {
       setLoaded(true);
     }
   }, [projectId, currentWorkspace]);
@@ -140,12 +144,55 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       });
   }, [user]);
 
+  // ✅ Broadcast inline — sem depender de função externa
+  const handleSceneChange = useCallback(() => {
+    if (isRemoteUpdate.current) return;
+    if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+
+    broadcastTimerRef.current = setTimeout(() => {
+      if (
+        !channelRef.current ||
+        !apiRef.current ||
+        !user ||
+        channelStatusRef.current !== "SUBSCRIBED"  // ✅ só envia se canal pronto
+      ) return;
+
+      const elements = apiRef.current.getSceneElements();
+      const files = apiRef.current.getFiles();
+      const appState = apiRef.current.getAppState();
+
+      channelRef.current.send({
+        type: "broadcast",
+        event: "scene-update",
+        payload: {
+          elements,
+          files,
+          appState: {
+            viewBackgroundColor: appState.viewBackgroundColor,
+            zoom: appState.zoom,
+            scrollX: appState.scrollX,
+            scrollY: appState.scrollY,
+          },
+          senderId: user.id,
+        },
+      });
+    }, 300);
+  }, [user]);
+
   // Realtime collaboration
   useEffect(() => {
     const contextId = projectId || currentWorkspace?.id;
     if (!contextId || !user) return;
 
     const channelName = `canvas:${contextId}`;
+
+    // ✅ Remove canal anterior antes de criar novo
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+      channelStatusRef.current = "";
+    }
+
     const channel = supabase.channel(channelName, {
       config: { broadcast: { self: false } },
     });
@@ -158,17 +205,31 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
         isRemoteUpdate.current = true;
         apiRef.current.updateScene({ elements, appState });
-        if (files) {
-          apiRef.current?.addFiles(Object.values(files));
+
+        if (files && Object.keys(files).length > 0) {
+          apiRef.current.addFiles(Object.values(files) as any);
         }
-        setTimeout(() => { isRemoteUpdate.current = false; }, 100);
+
+        // ✅ Dois frames para garantir que o onChange do Excalidraw já disparou
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            isRemoteUpdate.current = false;
+          });
+        });
       })
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
-        const users = Object.values(state).flat().map((p: any) => p.name).filter(Boolean);
-        setCollaborators(users.filter(u => u !== (user.user_metadata?.full_name || user.email)));
+        const users = Object.values(state)
+          .flat()
+          .map((p: any) => p.name)
+          .filter(Boolean);
+        setCollaborators(
+          users.filter((u) => u !== (user.user_metadata?.full_name || user.email))
+        );
       })
       .subscribe(async (status) => {
+        channelStatusRef.current = status; // ✅ atualiza status sempre
+
         if (status === "SUBSCRIBED") {
           await channel.track({
             user_id: user.id,
@@ -176,19 +237,32 @@ export function ExcalidrawCanvas({ projectId }: Props) {
             online_at: new Date().toISOString(),
           });
         }
+
+        // ✅ Reconexão automática em caso de erro
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn("Canal perdido, reconectando em 3s...");
+          setTimeout(() => {
+            supabase.removeChannel(channel);
+            channelRef.current = null;
+            channelStatusRef.current = "";
+            setCollaborators([]);
+          }, 3000);
+        }
       });
 
     channelRef.current = channel;
 
     return () => {
+      if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
       supabase.removeChannel(channel);
       channelRef.current = null;
+      channelStatusRef.current = "";
     };
   }, [projectId, currentWorkspace, user]);
 
   const loadCanvas = async () => {
     const query = supabase.from("canvases").select("*") as any;
-    
+
     if (projectId) {
       query.eq("project_id", projectId);
     } else if (currentWorkspace) {
@@ -209,15 +283,14 @@ export function ExcalidrawCanvas({ projectId }: Props) {
           const files = flowData.files || {};
           setInitialData({
             elements: flowData.elements,
-            appState: { 
+            appState: {
               ...flowData.appState,
               theme: "dark",
             },
           });
-          // Restore files after mount
           setTimeout(() => {
             if (apiRef.current && Object.keys(files).length > 0) {
-              apiRef.current.addFiles(Object.values(files));
+              apiRef.current.addFiles(Object.values(files) as any);
             }
           }, 500);
         }
@@ -228,38 +301,6 @@ export function ExcalidrawCanvas({ projectId }: Props) {
     }
     setLoaded(true);
   };
-
-  const broadcastScene = useCallback(() => {
-    if (!channelRef.current || !apiRef.current || isRemoteUpdate.current || !user) return;
-    const elements = apiRef.current.getSceneElements();
-    const files = apiRef.current.getFiles();
-    const appState = apiRef.current.getAppState();
-    const collaborativeAppState = {
-      viewBackgroundColor: appState.viewBackgroundColor,
-      zoom: appState.zoom,
-      scrollX: appState.scrollX,
-      scrollY: appState.scrollY,
-      zenMode: appState.zenMode,
-      gridMode: appState.gridMode,
-      viewMode: appState.viewMode,
-    };
-    channelRef.current.send({
-      type: "broadcast",
-      event: "scene-update",
-      payload: { elements, files, appState: collaborativeAppState, senderId: user.id },
-    });
-  }, [user]);
-
-  // Debounced broadcast on scene change
-  const broadcastTimerRef = useRef<any>(null);
-  const handleSceneChange = useCallback(
-    (elements: readonly ExcalidrawElement[], appState: AppState, files: BinaryFiles) => {
-      if (isRemoteUpdate.current) return;
-      if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
-      broadcastTimerRef.current = setTimeout(broadcastScene, 200);
-    },
-    [broadcastScene]
-  );
 
   const handleSave = async () => {
     if (!user || (!projectId && !currentWorkspace) || !apiRef.current) return;
@@ -283,25 +324,22 @@ export function ExcalidrawCanvas({ projectId }: Props) {
     };
 
     if (canvasId) {
-      await supabase.from("canvases").update({
-        react_flow_data: saveData as any,
-      }).eq("id", canvasId);
+      await supabase.from("canvases").update({ react_flow_data: saveData as any }).eq("id", canvasId);
     } else {
       const insertData: any = {
         name: projectId ? "Project Canvas" : "Workspace Canvas",
         react_flow_data: saveData as any,
         created_by: user.id,
       };
-      
       if (projectId) {
         insertData.project_id = projectId;
       } else {
         insertData.workspace_id = currentWorkspace?.id;
       }
-
       const { data } = await supabase.from("canvases").insert(insertData).select("id").single();
       if (data) setCanvasId(data.id);
     }
+
     setSaving(false);
     toast({ title: "Canvas salvo!" });
   };
@@ -340,23 +378,22 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       if (!result) throw new Error("Erro ao renderizar diagrama");
 
       const appState = apiRef.current.getAppState();
-      const centerX = -appState.scrollX + (window.innerWidth / 2 / appState.zoom.value) - result.element.width / 2;
-      const centerY = -appState.scrollY + (window.innerHeight / 2 / appState.zoom.value) - result.element.height / 2;
-      result.element.x = centerX;
-      result.element.y = centerY;
+      result.element.x =
+        -appState.scrollX + window.innerWidth / 2 / appState.zoom.value - result.element.width / 2;
+      result.element.y =
+        -appState.scrollY + window.innerHeight / 2 / appState.zoom.value - result.element.height / 2;
 
       apiRef.current.addFiles([result.file as any]);
       const currentElements = apiRef.current.getSceneElements();
-      apiRef.current.updateScene({
-        elements: [...currentElements, result.element as any],
-      });
+      apiRef.current.updateScene({ elements: [...currentElements, result.element] });
 
       toast({ title: "Diagrama inserido no canvas!" });
       setAiPrompt("");
       setShowAiPanel(false);
-      setTimeout(broadcastScene, 200);
-    } catch (e: any) {
-      toast({ title: "Erro ao gerar diagrama", description: e.message, variant: "destructive" });
+      setTimeout(handleSceneChange, 200); // ✅ propaga via broadcast
+    } catch (e: unknown) {
+      const error = e as Error;
+      toast({ title: "Erro ao gerar diagrama", description: error?.message, variant: "destructive" });
     } finally {
       setAiLoading(false);
     }
@@ -376,7 +413,9 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         {collaborators.length > 0 && (
           <div className="flex items-center gap-1 bg-card/90 backdrop-blur-sm border rounded-md px-2 py-1 shadow-lg">
             <Users className="h-3 w-3 text-emerald-500" />
-            <span className="text-xs text-muted-foreground">{collaborators.length} outro(s) online</span>
+            <span className="text-xs text-muted-foreground">
+              {collaborators.length} outro(s) online
+            </span>
           </div>
         )}
 
@@ -395,6 +434,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
             {saving ? "Salvando..." : "Salvar"}
           </Button>
         )}
+
         <Button size="sm" variant="outline" onClick={handleExport} className="shadow-lg bg-card">
           <Download className="h-3 w-3 mr-1" /> PNG
         </Button>
@@ -434,13 +474,17 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
       <Excalidraw
         excalidrawAPI={(api) => { apiRef.current = api; }}
-        initialData={initialData ? {
-          elements: initialData.elements as ExcalidrawElement[],
-          appState: initialData.appState,
-        } : undefined}
+        initialData={
+          initialData
+            ? {
+                elements: initialData.elements as ExcalidrawElement[],
+                appState: initialData.appState,
+              }
+            : undefined
+        }
         theme="dark"
         langCode="pt-BR"
-        onChange={handleSceneChange}
+        onChange={handleSceneChange}  // ✅ sem argumentos — lê estado internamente
       />
     </div>
   );
