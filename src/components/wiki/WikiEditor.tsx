@@ -93,8 +93,8 @@ export function WikiEditor({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
+    <div className="flex flex-col h-full relative">
+      {/* Header - Sem alterações */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
         <Input
           value={title}
@@ -140,7 +140,11 @@ export function WikiEditor({
           </TabsList>
         </div>
 
-        <TabsContent value="edit" className="flex-1 m-0 overflow-hidden flex flex-col">
+        {/* CORREÇÃO: Adicionado data-[state=active]:flex-1 e flex-col */}
+        <TabsContent 
+          value="edit" 
+          className="m-0 overflow-hidden flex-col data-[state=active]:flex-1 data-[state=active]:flex"
+        >
           <MarkdownToolbar
             textareaRef={textareaRef}
             content={content}
@@ -150,17 +154,24 @@ export function WikiEditor({
             ref={textareaRef}
             value={content}
             onChange={(e) => updateContent(e.target.value)}
-            className="flex-1 w-full resize-none rounded-none border-0 font-mono text-sm focus-visible:ring-0 bg-transparent"
+            className="flex-1 w-full resize-none rounded-none border-0 font-mono text-sm focus-visible:ring-0 bg-transparent p-4"
             placeholder="Escreva em Markdown..."
           />
         </TabsContent>
 
-        <TabsContent value="preview" className="flex-1 m-0 overflow-auto px-6 py-4">
+        {/* CORREÇÃO: Preview agora ocupa todo o espaço e permite scroll interno */}
+        <TabsContent 
+          value="preview" 
+          className="m-0 overflow-y-auto px-6 py-4 data-[state=active]:flex-1 data-[state=active]:flex flex-col"
+        >
           <MarkdownPreview content={content} />
         </TabsContent>
 
         {pendingDiff !== null && (
-          <TabsContent value="diff" className="flex-1 m-0 overflow-hidden">
+          <TabsContent 
+            value="diff" 
+            className="m-0 overflow-hidden data-[state=active]:flex-1 data-[state=active]:flex flex-col"
+          >
             <WikiDiffViewer
               original={content}
               modified={pendingDiff}
@@ -171,8 +182,8 @@ export function WikiEditor({
         )}
       </Tabs>
 
-      {/* AI Actions Bar */}
-      <div className="border-t border-border px-4 py-2 flex items-center gap-2">
+      {/* AI Actions Bar - Sem alterações */}
+      <div className="border-t border-border px-4 py-2 flex items-center gap-2 relative bottom-4">
         <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
         <Input
           value={aiPrompt}

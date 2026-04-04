@@ -194,7 +194,7 @@ export default function Docs() {
 
   return (
     <AppLayout title="Documentação">
-      <div className="flex flex-col h-[calc(100vh-4rem)] animate-fade-in">
+      <div className="flex flex-col h-[calc(100vh-6.5rem)] animate-fade-in">
         {/* Top bar */}
         <div className="px-4 py-2 border-b border-border flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
