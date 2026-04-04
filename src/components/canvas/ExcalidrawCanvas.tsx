@@ -342,7 +342,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       apiRef.current.addFiles([result.file as any]);
       const currentElements = apiRef.current.getSceneElements();
       apiRef.current.updateScene({
-        elements: [...currentElements, result.element as any],
+        elements: [...currentElements, centeredElement as any],
       });
 
       toast({ title: "Diagrama inserido no canvas!" });
