@@ -118,7 +118,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
   // Realtime state
   const [collaborators, setCollaborators] = useState<string[]>([]);
-  const channelRef = useRef<SupabaseChannel>(null);
+  const channelRef = useRef<RealtimeChannel>(null);
   const isRemoteUpdate = useRef(false);
 
   useEffect(() => {
