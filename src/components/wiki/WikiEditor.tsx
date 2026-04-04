@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import ReactMarkdown from "react-markdown";
-import { Save, Eye, Code, Sparkles, Network } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Save, Eye, Code, Sparkles, Network, GitCompare } from "lucide-react";
+import { MarkdownPreview } from "./MarkdownPreview";
+import { WikiDiffViewer } from "./WikiDiffViewer";
+import { MarkdownToolbar } from "./MarkdownToolbar";
 
 interface WikiEditorProps {
   pageId: string;
@@ -14,7 +15,7 @@ interface WikiEditorProps {
   content: string;
   updatedAt: string;
   onSave: (title: string, content: string) => void;
-  onGenerateDoc: (prompt: string) => void;
+  onGenerateDoc: (prompt: string) => Promise<string | void>;
   onGenerateDiagram: (prompt: string) => void;
   isSaving: boolean;
   isGenerating: boolean;
@@ -36,11 +37,14 @@ export function WikiEditor({
   const [tab, setTab] = useState<string>("edit");
   const [aiPrompt, setAiPrompt] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
+  const [pendingDiff, setPendingDiff] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     setTitle(initialTitle);
     setContent(initialContent);
     setHasChanges(false);
+    setPendingDiff(null);
   }, [pageId, initialTitle, initialContent]);
 
   const handleSave = useCallback(() => {
@@ -59,6 +63,35 @@ export function WikiEditor({
     return () => window.removeEventListener("keydown", handler);
   }, [handleSave]);
 
+  const updateContent = useCallback((newContent: string) => {
+    setContent(newContent);
+    setHasChanges(true);
+  }, []);
+
+  const handleGenerateWithDiff = async () => {
+    if (!aiPrompt.trim()) return;
+    const generated = await onGenerateDoc(aiPrompt);
+    if (generated && typeof generated === "string") {
+      const newContent = content ? content + "\n\n" + generated : generated;
+      setPendingDiff(newContent);
+      setTab("diff");
+    }
+  };
+
+  const handleAcceptDiff = () => {
+    if (pendingDiff !== null) {
+      setContent(pendingDiff);
+      setHasChanges(true);
+      setPendingDiff(null);
+      setTab("edit");
+    }
+  };
+
+  const handleRejectDiff = () => {
+    setPendingDiff(null);
+    setTab("edit");
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -74,7 +107,7 @@ export function WikiEditor({
         />
         <div className="flex items-center gap-2 shrink-0">
           {hasChanges && (
-            <Badge variant="outline" className="text-xs text-amber-400 border-amber-400/30">
+            <Badge variant="outline" className="text-xs text-warning border-warning/30">
               Não salvo
             </Badge>
           )}
@@ -89,7 +122,7 @@ export function WikiEditor({
       </div>
 
       {/* Tabs */}
-      <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col">
+      <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col min-h-0">
         <div className="px-4 pt-2 border-b border-border">
           <TabsList className="bg-transparent h-8">
             <TabsTrigger value="edit" className="text-xs gap-1 h-7">
@@ -98,26 +131,44 @@ export function WikiEditor({
             <TabsTrigger value="preview" className="text-xs gap-1 h-7">
               <Eye className="h-3 w-3" /> Preview
             </TabsTrigger>
+            {pendingDiff !== null && (
+              <TabsTrigger value="diff" className="text-xs gap-1 h-7">
+                <GitCompare className="h-3 w-3" /> Diff IA
+                <Badge className="ml-1 h-4 px-1 text-[10px] bg-primary">novo</Badge>
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
-        <TabsContent value="edit" className="flex-1 m-0 overflow-hidden">
+        <TabsContent value="edit" className="flex-1 m-0 overflow-hidden flex flex-col">
+          <MarkdownToolbar
+            textareaRef={textareaRef}
+            content={content}
+            onContentChange={updateContent}
+          />
           <Textarea
+            ref={textareaRef}
             value={content}
-            onChange={(e) => {
-              setContent(e.target.value);
-              setHasChanges(true);
-            }}
-            className="h-full w-full resize-none rounded-none border-0 font-mono text-sm focus-visible:ring-0 bg-transparent"
+            onChange={(e) => updateContent(e.target.value)}
+            className="flex-1 w-full resize-none rounded-none border-0 font-mono text-sm focus-visible:ring-0 bg-transparent"
             placeholder="Escreva em Markdown..."
           />
         </TabsContent>
 
         <TabsContent value="preview" className="flex-1 m-0 overflow-auto px-6 py-4">
-          <div className="prose prose-invert prose-sm max-w-none">
-            <ReactMarkdown>{content || "*Sem conteúdo*"}</ReactMarkdown>
-          </div>
+          <MarkdownPreview content={content} />
         </TabsContent>
+
+        {pendingDiff !== null && (
+          <TabsContent value="diff" className="flex-1 m-0 overflow-hidden">
+            <WikiDiffViewer
+              original={content}
+              modified={pendingDiff}
+              onAccept={handleAcceptDiff}
+              onReject={handleRejectDiff}
+            />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* AI Actions Bar */}
@@ -130,7 +181,7 @@ export function WikiEditor({
           className="h-7 text-xs flex-1"
           onKeyDown={(e) => {
             if (e.key === "Enter" && aiPrompt.trim()) {
-              onGenerateDoc(aiPrompt);
+              handleGenerateWithDiff();
             }
           }}
         />
@@ -139,7 +190,7 @@ export function WikiEditor({
           variant="outline"
           className="h-7 text-xs"
           disabled={!aiPrompt.trim() || isGenerating}
-          onClick={() => onGenerateDoc(aiPrompt)}
+          onClick={handleGenerateWithDiff}
         >
           <Sparkles className="h-3 w-3 mr-1" />
           Doc

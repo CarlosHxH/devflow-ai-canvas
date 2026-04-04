@@ -25,7 +25,7 @@ function generateId() {
 
 async function mermaidToImageElement(
   code: string
-): Promise<{ element: ExcalidrawElement; fileId: string; file: { mimeType: string; id: string; dataURL: string; created: number } } | null> {
+): Promise<{ element: any; fileId: string; file: { mimeType: string; id: string; dataURL: string; created: number } } | null> {
   try {
     const id = `mermaid-render-${Date.now()}`;
     const { svg: svgStr } = await mermaid.render(id, code.trim());
@@ -78,7 +78,7 @@ async function mermaidToImageElement(
       link: null,
       locked: false,
       status: "saved" as const,
-      fileId,
+      fileId: fileId as any,
       scale: [1, 1] as [number, number],
       crop: null,
     };
@@ -313,13 +313,10 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       elements,
       files,
       appState: {
-        viewBackgroundColor: appState.viewBackgroundColor,
+        viewBackgroundColor: (appState as any).viewBackgroundColor,
         zoom: appState.zoom,
         scrollX: appState.scrollX,
         scrollY: appState.scrollY,
-        zenMode: appState.zenMode,
-        gridMode: appState.gridMode,
-        viewMode: appState.viewMode,
       },
     };
 
