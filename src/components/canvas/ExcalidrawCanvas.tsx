@@ -270,13 +270,10 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       elements,
       files,
       appState: {
-        viewBackgroundColor: appState.viewBackgroundColor,
+        viewBackgroundColor: (appState as any).viewBackgroundColor,
         zoom: appState.zoom,
         scrollX: appState.scrollX,
         scrollY: appState.scrollY,
-        zenMode: appState.zenMode,
-        gridMode: appState.gridMode,
-        viewMode: appState.viewMode,
       },
     };
 
