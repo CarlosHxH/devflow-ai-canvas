@@ -3,6 +3,7 @@ import { Excalidraw, exportToBlob } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -24,7 +25,7 @@ function generateId() {
 
 async function mermaidToImageElement(
   code: string
-): Promise<{ element: ExcalidrawElement; fileId: string; file: { mimeType: string; id: string; dataURL: string; created: number } } | null> {
+): Promise<{ element: any; fileId: string; file: { mimeType: string; id: string; dataURL: string; created: number } } | null> {
   try {
     const id = `mermaid-render-${Date.now()}`;
     const { svg: svgStr } = await mermaid.render(id, code.trim());
@@ -77,7 +78,7 @@ async function mermaidToImageElement(
       link: null,
       locked: false,
       status: "saved" as const,
-      fileId,
+      fileId: fileId as any,
       scale: [1, 1] as [number, number],
       crop: null,
     };
@@ -117,7 +118,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
   // Realtime state
   const [collaborators, setCollaborators] = useState<string[]>([]);
-  const channelRef = useRef<SupabaseChannel>(null);
+  const channelRef = useRef<RealtimeChannel>(null);
   const isRemoteUpdate = useRef(false);
 
   useEffect(() => {
@@ -235,13 +236,10 @@ export function ExcalidrawCanvas({ projectId }: Props) {
     const files = apiRef.current.getFiles();
     const appState = apiRef.current.getAppState();
     const collaborativeAppState = {
-      viewBackgroundColor: appState.viewBackgroundColor,
+      viewBackgroundColor: (appState as any).viewBackgroundColor,
       zoom: appState.zoom,
       scrollX: appState.scrollX,
       scrollY: appState.scrollY,
-      zenMode: appState.zenMode,
-      gridMode: appState.gridMode,
-      viewMode: appState.viewMode,
     };
     channelRef.current.send({
       type: "broadcast",
@@ -272,13 +270,10 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       elements,
       files,
       appState: {
-        viewBackgroundColor: appState.viewBackgroundColor,
+        viewBackgroundColor: (appState as any).viewBackgroundColor,
         zoom: appState.zoom,
         scrollX: appState.scrollX,
         scrollY: appState.scrollY,
-        zenMode: appState.zenMode,
-        gridMode: appState.gridMode,
-        viewMode: appState.viewMode,
       },
     };
 
@@ -342,13 +337,12 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       const appState = apiRef.current.getAppState();
       const centerX = -appState.scrollX + (window.innerWidth / 2 / appState.zoom.value) - result.element.width / 2;
       const centerY = -appState.scrollY + (window.innerHeight / 2 / appState.zoom.value) - result.element.height / 2;
-      result.element.x = centerX;
-      result.element.y = centerY;
+      const centeredElement = { ...result.element, x: centerX, y: centerY };
 
       apiRef.current.addFiles([result.file as any]);
       const currentElements = apiRef.current.getSceneElements();
       apiRef.current.updateScene({
-        elements: [...currentElements, result.element as any],
+        elements: [...currentElements, centeredElement as any],
       });
 
       toast({ title: "Diagrama inserido no canvas!" });
