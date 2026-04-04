@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Save, Eye, Code, Sparkles, Network, GitCompare } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { WikiDiffViewer } from "./WikiDiffViewer";
+import { MarkdownToolbar } from "./MarkdownToolbar";
 
 interface WikiEditorProps {
   pageId: string;
@@ -38,6 +38,7 @@ export function WikiEditor({
   const [aiPrompt, setAiPrompt] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
   const [pendingDiff, setPendingDiff] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     setTitle(initialTitle);
@@ -61,6 +62,11 @@ export function WikiEditor({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [handleSave]);
+
+  const updateContent = useCallback((newContent: string) => {
+    setContent(newContent);
+    setHasChanges(true);
+  }, []);
 
   const handleGenerateWithDiff = async () => {
     if (!aiPrompt.trim()) return;
@@ -134,14 +140,17 @@ export function WikiEditor({
           </TabsList>
         </div>
 
-        <TabsContent value="edit" className="flex-1 m-0 overflow-hidden">
+        <TabsContent value="edit" className="flex-1 m-0 overflow-hidden flex flex-col">
+          <MarkdownToolbar
+            textareaRef={textareaRef}
+            content={content}
+            onContentChange={updateContent}
+          />
           <Textarea
+            ref={textareaRef}
             value={content}
-            onChange={(e) => {
-              setContent(e.target.value);
-              setHasChanges(true);
-            }}
-            className="h-full w-full resize-none rounded-none border-0 font-mono text-sm focus-visible:ring-0 bg-transparent"
+            onChange={(e) => updateContent(e.target.value)}
+            className="flex-1 w-full resize-none rounded-none border-0 font-mono text-sm focus-visible:ring-0 bg-transparent"
             placeholder="Escreva em Markdown..."
           />
         </TabsContent>
