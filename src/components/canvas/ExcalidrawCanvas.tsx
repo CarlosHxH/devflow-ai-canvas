@@ -337,8 +337,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       const appState = apiRef.current.getAppState();
       const centerX = -appState.scrollX + (window.innerWidth / 2 / appState.zoom.value) - result.element.width / 2;
       const centerY = -appState.scrollY + (window.innerHeight / 2 / appState.zoom.value) - result.element.height / 2;
-      result.element.x = centerX;
-      result.element.y = centerY;
+      const centeredElement = { ...result.element, x: centerX, y: centerY };
 
       apiRef.current.addFiles([result.file as any]);
       const currentElements = apiRef.current.getSceneElements();
