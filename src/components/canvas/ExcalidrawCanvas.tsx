@@ -78,7 +78,7 @@ async function mermaidToImageElement(
       link: null,
       locked: false,
       status: "saved" as const,
-      fileId,
+      fileId: fileId as any,
       scale: [1, 1] as [number, number],
       crop: null,
     };
