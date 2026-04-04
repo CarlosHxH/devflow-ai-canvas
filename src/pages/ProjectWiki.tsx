@@ -96,7 +96,7 @@ export default function ProjectWiki() {
     setIsSaving(false);
   };
 
-  const handleGenerateDoc = async (prompt: string) => {
+  const handleGenerateDoc = async (prompt: string): Promise<string | void> => {
     if (!selectedPage) return;
     setIsGenerating(true);
     let generated = "";
@@ -154,15 +154,7 @@ export default function ProjectWiki() {
       }
 
       if (generated) {
-        const newContent = selectedPage.content_markdown
-          ? selectedPage.content_markdown + "\n\n" + generated
-          : generated;
-        await supabase
-          .from("wiki_pages")
-          .update({ content_markdown: newContent })
-          .eq("id", selectedPage.id);
-        fetchPages();
-        toast.success("Documentação gerada com IA");
+        return generated;
       }
     } catch {
       toast.error("Erro ao gerar documentação");
