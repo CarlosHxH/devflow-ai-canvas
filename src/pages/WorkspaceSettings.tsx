@@ -422,14 +422,22 @@ export default function WorkspaceSettings() {
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="flex items-center gap-4">
-                  <Avatar className="h-16 w-16">
-                    <AvatarFallback className="text-xl bg-primary/10 text-primary font-bold">
-                      {userInitials}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="relative group">
+                    <Avatar className="h-16 w-16">
+                      {profile.avatar_url && <AvatarImage src={profile.avatar_url} />}
+                      <AvatarFallback className="text-xl bg-primary/10 text-primary font-bold">
+                        {userInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                      {uploadingAvatar ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Upload className="h-5 w-5 text-white" />}
+                      <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+                    </label>
+                  </div>
                   <div>
                     <p className="font-medium">{profile.full_name || "Sem nome"}</p>
                     <p className="text-sm text-muted-foreground">{user?.email}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Passe o mouse no avatar para trocar a foto</p>
                   </div>
                 </div>
 
@@ -443,15 +451,6 @@ export default function WorkspaceSettings() {
                       value={profile.full_name}
                       onChange={(e) => setProfile((p) => ({ ...p, full_name: e.target.value }))}
                       placeholder="Seu nome"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="profile-avatar">URL do Avatar</Label>
-                    <Input
-                      id="profile-avatar"
-                      value={profile.avatar_url}
-                      onChange={(e) => setProfile((p) => ({ ...p, avatar_url: e.target.value }))}
-                      placeholder="https://..."
                     />
                   </div>
                 </div>
