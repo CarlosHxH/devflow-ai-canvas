@@ -61,7 +61,7 @@ export function KanbanBoard({ projectId }: Props) {
 
     // Fetch workspace members (only accepted) with their profiles
     const workspaceId = projectRes.data?.workspace_id;
-    let workspaceMembers: Member[] = [];
+    const workspaceMembers: Member[] = [];
     const profileMap = new Map<string, string>();
 
     if (workspaceId) {
