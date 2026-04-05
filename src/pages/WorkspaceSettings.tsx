@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { UserPlus, Mail, Trash2, Shield, Building2, User, Crown, Save, Key, Eye, EyeOff, Upload, Loader2 } from "lucide-react";
 import { AvatarImage } from "@/components/ui/avatar";
+import { AvatarCropDialog } from "@/components/profile/AvatarCropDialog";
 
 interface Member {
   id: string;
