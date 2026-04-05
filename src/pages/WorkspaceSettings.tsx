@@ -175,13 +175,24 @@ export default function WorkspaceSettings() {
 
   // ---- Profile ----
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [showCrop, setShowCrop] = useState(false);
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
+    setCropFile(file);
+    setShowCrop(true);
+    e.target.value = "";
+  };
+
+  const handleCroppedUpload = async (blob: Blob) => {
+    if (!user) return;
+    setShowCrop(false);
     setUploadingAvatar(true);
-    const fileExt = file.name.split(".").pop();
-    const filePath = `${user.id}/avatar.${fileExt}`;
+
+    const filePath = `${user.id}/avatar.png`;
+    const file = new File([blob], "avatar.png", { type: "image/png" });
 
     const { error: uploadError } = await supabase.storage
       .from("avatars")
