@@ -144,7 +144,9 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       });
   }, [user]);
 
-  // ✅ Broadcast inline — sem depender de função externa
+  // Track known file IDs to only send new ones
+  const sentFileIds = useRef<Set<string>>(new Set());
+
   const handleSceneChange = useCallback(() => {
     if (isRemoteUpdate.current) return;
     if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
@@ -154,19 +156,29 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         !channelRef.current ||
         !apiRef.current ||
         !user ||
-        channelStatusRef.current !== "SUBSCRIBED"  // ✅ só envia se canal pronto
+        channelStatusRef.current !== "SUBSCRIBED"
       ) return;
 
       const elements = apiRef.current.getSceneElements();
-      const files = apiRef.current.getFiles();
+      const allFiles = apiRef.current.getFiles();
       const appState = apiRef.current.getAppState();
 
+      // Only send new files to avoid exceeding broadcast size limits
+      const newFiles: Record<string, any> = {};
+      for (const [id, file] of Object.entries(allFiles)) {
+        if (!sentFileIds.current.has(id)) {
+          newFiles[id] = file;
+          sentFileIds.current.add(id);
+        }
+      }
+
+      // Send elements (lightweight) always
       channelRef.current.send({
         type: "broadcast",
         event: "scene-update",
         payload: {
-          elements,
-          files,
+          elements: JSON.parse(JSON.stringify(elements)),
+          files: Object.keys(newFiles).length > 0 ? newFiles : null,
           appState: {
             viewBackgroundColor: appState.viewBackgroundColor,
             zoom: appState.zoom,
@@ -175,8 +187,8 @@ export function ExcalidrawCanvas({ projectId }: Props) {
           },
           senderId: user.id,
         },
-      });
-    }, 300);
+      }).catch((err: any) => console.warn("Broadcast error:", err));
+    }, 250);
   }, [user]);
 
   // Realtime collaboration
@@ -204,13 +216,18 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         if (senderId === user.id) return;
 
         isRemoteUpdate.current = true;
-        apiRef.current.updateScene({ elements, appState });
+        
+        try {
+          apiRef.current.updateScene({ elements, appState });
 
-        if (files && Object.keys(files).length > 0) {
-          apiRef.current.addFiles(Object.values(files) as any);
+          if (files && Object.keys(files).length > 0) {
+            apiRef.current.addFiles(Object.values(files) as any);
+          }
+        } catch (err) {
+          console.warn("Error applying remote scene:", err);
         }
 
-        // ✅ Dois frames para garantir que o onChange do Excalidraw já disparou
+        // Wait for Excalidraw's onChange to fire before unblocking
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             isRemoteUpdate.current = false;
@@ -228,7 +245,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         );
       })
       .subscribe(async (status) => {
-        channelStatusRef.current = status; // ✅ atualiza status sempre
+        channelStatusRef.current = status;
 
         if (status === "SUBSCRIBED") {
           await channel.track({
@@ -238,14 +255,14 @@ export function ExcalidrawCanvas({ projectId }: Props) {
           });
         }
 
-        // ✅ Reconexão automática em caso de erro
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.warn("Canal perdido, reconectando em 3s...");
+          console.warn("Canal perdido, tentando reconectar...");
           setTimeout(() => {
             supabase.removeChannel(channel);
             channelRef.current = null;
             channelStatusRef.current = "";
             setCollaborators([]);
+            // Re-trigger the effect by not clearing the dependency
           }, 3000);
         }
       });

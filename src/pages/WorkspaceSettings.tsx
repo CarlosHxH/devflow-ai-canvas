@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { UserPlus, Mail, Trash2, Shield, Building2, User, Crown, Save, Key, Eye, EyeOff, Upload, Loader2 } from "lucide-react";
 import { AvatarImage } from "@/components/ui/avatar";
+import { AvatarCropDialog } from "@/components/profile/AvatarCropDialog";
 
 interface Member {
   id: string;
@@ -174,13 +175,24 @@ export default function WorkspaceSettings() {
 
   // ---- Profile ----
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [showCrop, setShowCrop] = useState(false);
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
+    setCropFile(file);
+    setShowCrop(true);
+    e.target.value = "";
+  };
+
+  const handleCroppedUpload = async (blob: Blob) => {
+    if (!user) return;
+    setShowCrop(false);
     setUploadingAvatar(true);
-    const fileExt = file.name.split(".").pop();
-    const filePath = `${user.id}/avatar.${fileExt}`;
+
+    const filePath = `${user.id}/avatar.png`;
+    const file = new File([blob], "avatar.png", { type: "image/png" });
 
     const { error: uploadError } = await supabase.storage
       .from("avatars")
@@ -431,7 +443,7 @@ export default function WorkspaceSettings() {
                     </Avatar>
                     <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                       {uploadingAvatar ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Upload className="h-5 w-5 text-white" />}
-                      <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+                      <input type="file" accept="image/*" className="hidden" onChange={handleFileSelect} disabled={uploadingAvatar} />
                     </label>
                   </div>
                   <div>
@@ -440,6 +452,7 @@ export default function WorkspaceSettings() {
                     <p className="text-xs text-muted-foreground mt-1">Passe o mouse no avatar para trocar a foto</p>
                   </div>
                 </div>
+                <AvatarCropDialog open={showCrop} imageFile={cropFile} onClose={() => setShowCrop(false)} onCrop={handleCroppedUpload} />
 
                 <Separator />
 
