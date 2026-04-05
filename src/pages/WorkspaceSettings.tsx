@@ -77,11 +77,27 @@ export default function WorkspaceSettings() {
     if (!currentWorkspace) return;
     const { data } = await supabase
       .from("workspace_members")
-      .select("*, profiles:user_id(full_name, avatar_url)")
+      .select("*")
       .eq("workspace_id", currentWorkspace.id);
-    if (data) {
-      setMembers(data.map((m: any) => ({ ...m, profile: m.profiles })));
+    if (!data) return;
+
+    // Fetch profiles for members that have user_id
+    const userIds = data.map((m) => m.user_id).filter(Boolean) as string[];
+    let profilesMap: Record<string, { full_name: string | null; avatar_url: string | null }> = {};
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .in("id", userIds);
+      if (profiles) {
+        profiles.forEach((p) => { profilesMap[p.id] = p; });
+      }
     }
+
+    setMembers(data.map((m: any) => ({
+      ...m,
+      profile: m.user_id ? profilesMap[m.user_id] || null : null,
+    })));
   };
 
   const fetchProfile = async () => {
