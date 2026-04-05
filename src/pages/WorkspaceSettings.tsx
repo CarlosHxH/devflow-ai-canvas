@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { UserPlus, Mail, Trash2, Shield, Building2, User, Crown, Save, Key, Eye, EyeOff } from "lucide-react";
+import { UserPlus, Mail, Trash2, Shield, Building2, User, Crown, Save, Key, Eye, EyeOff, Upload, Loader2 } from "lucide-react";
+import { AvatarImage } from "@/components/ui/avatar";
 
 interface Member {
   id: string;
@@ -172,6 +173,37 @@ export default function WorkspaceSettings() {
   };
 
   // ---- Profile ----
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploadingAvatar(true);
+    const fileExt = file.name.split(".").pop();
+    const filePath = `${user.id}/avatar.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadError) {
+      toast.error("Erro ao enviar imagem: " + uploadError.message);
+      setUploadingAvatar(false);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
+    const avatarUrl = urlData.publicUrl + "?t=" + Date.now();
+
+    const { error } = await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("id", user.id);
+    if (error) toast.error("Erro ao salvar avatar");
+    else {
+      setProfile((p) => ({ ...p, avatar_url: avatarUrl }));
+      toast.success("Avatar atualizado!");
+    }
+    setUploadingAvatar(false);
+  };
+
   const handleSaveProfile = async () => {
     if (!user) return;
     setSavingProfile(true);
