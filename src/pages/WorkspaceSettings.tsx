@@ -443,7 +443,7 @@ export default function WorkspaceSettings() {
                     </Avatar>
                     <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                       {uploadingAvatar ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Upload className="h-5 w-5 text-white" />}
-                      <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+                      <input type="file" accept="image/*" className="hidden" onChange={handleFileSelect} disabled={uploadingAvatar} />
                     </label>
                   </div>
                   <div>
