@@ -144,7 +144,9 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       });
   }, [user]);
 
-  // ✅ Broadcast inline — sem depender de função externa
+  // Track known file IDs to only send new ones
+  const sentFileIds = useRef<Set<string>>(new Set());
+
   const handleSceneChange = useCallback(() => {
     if (isRemoteUpdate.current) return;
     if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
@@ -154,19 +156,29 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         !channelRef.current ||
         !apiRef.current ||
         !user ||
-        channelStatusRef.current !== "SUBSCRIBED"  // ✅ só envia se canal pronto
+        channelStatusRef.current !== "SUBSCRIBED"
       ) return;
 
       const elements = apiRef.current.getSceneElements();
-      const files = apiRef.current.getFiles();
+      const allFiles = apiRef.current.getFiles();
       const appState = apiRef.current.getAppState();
 
+      // Only send new files to avoid exceeding broadcast size limits
+      const newFiles: Record<string, any> = {};
+      for (const [id, file] of Object.entries(allFiles)) {
+        if (!sentFileIds.current.has(id)) {
+          newFiles[id] = file;
+          sentFileIds.current.add(id);
+        }
+      }
+
+      // Send elements (lightweight) always
       channelRef.current.send({
         type: "broadcast",
         event: "scene-update",
         payload: {
-          elements,
-          files,
+          elements: JSON.parse(JSON.stringify(elements)),
+          files: Object.keys(newFiles).length > 0 ? newFiles : null,
           appState: {
             viewBackgroundColor: appState.viewBackgroundColor,
             zoom: appState.zoom,
@@ -175,8 +187,8 @@ export function ExcalidrawCanvas({ projectId }: Props) {
           },
           senderId: user.id,
         },
-      });
-    }, 300);
+      }).catch((err: any) => console.warn("Broadcast error:", err));
+    }, 250);
   }, [user]);
 
   // Realtime collaboration
