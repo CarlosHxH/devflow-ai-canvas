@@ -452,6 +452,7 @@ export default function WorkspaceSettings() {
                     <p className="text-xs text-muted-foreground mt-1">Passe o mouse no avatar para trocar a foto</p>
                   </div>
                 </div>
+                <AvatarCropDialog open={showCrop} imageFile={cropFile} onClose={() => setShowCrop(false)} onCrop={handleCroppedUpload} />
 
                 <Separator />
 
