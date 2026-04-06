@@ -119,10 +119,12 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
   // Realtime state
   const [collaborators, setCollaborators] = useState<string[]>([]);
-  const channelRef = useRef<RealtimeChannel | null>(null);       // ✅ tipo correto
-  const channelStatusRef = useRef<string>("");                    // ✅ rastreia status
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const channelStatusRef = useRef<string>("");
   const isRemoteUpdate = useRef(false);
   const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const remoteCollaboratorsRef = useRef<Map<string, any>>(new Map());
 
   useEffect(() => {
     if (projectId || currentWorkspace) {
@@ -147,6 +149,23 @@ export function ExcalidrawCanvas({ projectId }: Props) {
   // Track known file IDs to only send new ones
   const sentFileIds = useRef<Set<string>>(new Set());
 
+  const handlePointerUpdate = useCallback((payload: { pointer: { x: number; y: number }; button: string }) => {
+    if (!channelRef.current || !user || channelStatusRef.current !== "SUBSCRIBED") return;
+    if (pointerTimerRef.current) clearTimeout(pointerTimerRef.current);
+    pointerTimerRef.current = setTimeout(() => {
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "cursor-update",
+        payload: {
+          pointer: payload.pointer,
+          button: payload.button,
+          senderId: user.id,
+          username: user.user_metadata?.full_name || user.email || "Anônimo",
+        },
+      }).catch(() => {});
+    }, 50);
+  }, [user]);
+
   const handleSceneChange = useCallback(() => {
     if (isRemoteUpdate.current) return;
     if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
@@ -163,7 +182,6 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       const allFiles = apiRef.current.getFiles();
       const appState = apiRef.current.getAppState();
 
-      // Only send new files to avoid exceeding broadcast size limits
       const newFiles: Record<string, any> = {};
       for (const [id, file] of Object.entries(allFiles)) {
         if (!sentFileIds.current.has(id)) {
@@ -172,7 +190,6 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         }
       }
 
-      // Send elements (lightweight) always
       channelRef.current.send({
         type: "broadcast",
         event: "scene-update",
@@ -227,15 +244,35 @@ export function ExcalidrawCanvas({ projectId }: Props) {
           console.warn("Error applying remote scene:", err);
         }
 
-        // Wait for Excalidraw's onChange to fire before unblocking
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             isRemoteUpdate.current = false;
           });
         });
       })
+      .on("broadcast", { event: "cursor-update" }, (payload: any) => {
+        if (!apiRef.current) return;
+        const { pointer, button, senderId, username } = payload.payload;
+        if (senderId === user.id) return;
+
+        remoteCollaboratorsRef.current.set(senderId, {
+          username,
+          pointer,
+          button,
+        });
+
+        const collaboratorsMap = new Map<string, any>();
+        remoteCollaboratorsRef.current.forEach((value, key) => {
+          collaboratorsMap.set(key, value);
+        });
+
+        apiRef.current.updateScene({ collaborators: collaboratorsMap as any });
+      })
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
+        const presentUserIds = new Set(
+          Object.values(state).flat().map((p: any) => p.user_id).filter(Boolean)
+        );
         const users = Object.values(state)
           .flat()
           .map((p: any) => p.name)
@@ -243,6 +280,20 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         setCollaborators(
           users.filter((u) => u !== (user.user_metadata?.full_name || user.email))
         );
+
+        // Clean up collaborators who left
+        for (const id of remoteCollaboratorsRef.current.keys()) {
+          if (!presentUserIds.has(id)) {
+            remoteCollaboratorsRef.current.delete(id);
+          }
+        }
+        if (apiRef.current) {
+          const collaboratorsMap = new Map<string, any>();
+          remoteCollaboratorsRef.current.forEach((value, key) => {
+            collaboratorsMap.set(key, value);
+          });
+          apiRef.current.updateScene({ collaborators: collaboratorsMap as any });
+        }
       })
       .subscribe(async (status) => {
         channelStatusRef.current = status;
@@ -262,7 +313,6 @@ export function ExcalidrawCanvas({ projectId }: Props) {
             channelRef.current = null;
             channelStatusRef.current = "";
             setCollaborators([]);
-            // Re-trigger the effect by not clearing the dependency
           }, 3000);
         }
       });
@@ -271,9 +321,11 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
     return () => {
       if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+      if (pointerTimerRef.current) clearTimeout(pointerTimerRef.current);
       supabase.removeChannel(channel);
       channelRef.current = null;
       channelStatusRef.current = "";
+      remoteCollaboratorsRef.current.clear();
     };
   }, [projectId, currentWorkspace, user]);
 
@@ -498,7 +550,8 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         }
         theme="dark"
         langCode="pt-BR"
-        onChange={handleSceneChange}  // ✅ sem argumentos — lê estado internamente
+        onChange={handleSceneChange}
+        onPointerUpdate={handlePointerUpdate}
       />
     </div>
   );
