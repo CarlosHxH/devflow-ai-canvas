@@ -244,15 +244,35 @@ export function ExcalidrawCanvas({ projectId }: Props) {
           console.warn("Error applying remote scene:", err);
         }
 
-        // Wait for Excalidraw's onChange to fire before unblocking
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             isRemoteUpdate.current = false;
           });
         });
       })
+      .on("broadcast", { event: "cursor-update" }, (payload: any) => {
+        if (!apiRef.current) return;
+        const { pointer, button, senderId, username } = payload.payload;
+        if (senderId === user.id) return;
+
+        remoteCollaboratorsRef.current.set(senderId, {
+          username,
+          pointer,
+          button,
+        });
+
+        const collaboratorsMap = new Map<string, any>();
+        remoteCollaboratorsRef.current.forEach((value, key) => {
+          collaboratorsMap.set(key, value);
+        });
+
+        apiRef.current.updateScene({ collaborators: collaboratorsMap });
+      })
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
+        const presentUserIds = new Set(
+          Object.values(state).flat().map((p: any) => p.user_id).filter(Boolean)
+        );
         const users = Object.values(state)
           .flat()
           .map((p: any) => p.name)
@@ -260,6 +280,20 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         setCollaborators(
           users.filter((u) => u !== (user.user_metadata?.full_name || user.email))
         );
+
+        // Clean up collaborators who left
+        for (const id of remoteCollaboratorsRef.current.keys()) {
+          if (!presentUserIds.has(id)) {
+            remoteCollaboratorsRef.current.delete(id);
+          }
+        }
+        if (apiRef.current) {
+          const collaboratorsMap = new Map<string, any>();
+          remoteCollaboratorsRef.current.forEach((value, key) => {
+            collaboratorsMap.set(key, value);
+          });
+          apiRef.current.updateScene({ collaborators: collaboratorsMap });
+        }
       })
       .subscribe(async (status) => {
         channelStatusRef.current = status;
@@ -279,7 +313,6 @@ export function ExcalidrawCanvas({ projectId }: Props) {
             channelRef.current = null;
             channelStatusRef.current = "";
             setCollaborators([]);
-            // Re-trigger the effect by not clearing the dependency
           }, 3000);
         }
       });
@@ -288,9 +321,11 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
     return () => {
       if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+      if (pointerTimerRef.current) clearTimeout(pointerTimerRef.current);
       supabase.removeChannel(channel);
       channelRef.current = null;
       channelStatusRef.current = "";
+      remoteCollaboratorsRef.current.clear();
     };
   }, [projectId, currentWorkspace, user]);
 
