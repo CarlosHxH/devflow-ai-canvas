@@ -38,15 +38,30 @@ async function mermaidToImageElement(
       image.src = svgDataUrl;
     });
 
-    const imgWidth = img.naturalWidth || 800;
-    const imgHeight = img.naturalHeight || 600;
-    const canvas = document.createElement("canvas");
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svgStr, "image/svg+xml");
+    const svgEl = svgDoc.querySelector("svg");
+    let imgWidth = img.naturalWidth || 800;
+    let imgHeight = img.naturalHeight || 600;
+    if (svgEl) {
+      const vb = svgEl.getAttribute("viewBox");
+      if (vb) {
+        const parts = vb.split(/[\s,]+/).map(Number);
+        if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+          imgWidth = parts[2];
+          imgHeight = parts[3];
+        }
+      }
+      const w = parseFloat(svgEl.getAttribute("width") || "0");
+      const h = parseFloat(svgEl.getAttribute("height") || "0");
+      if (w > 0 && h > 0) { imgWidth = w; imgHeight = h; }
+    }
     const scale = 2;
+    const canvas = document.createElement("canvas");
     canvas.width = imgWidth * scale;
     canvas.height = imgHeight * scale;
     const ctx = canvas.getContext("2d")!;
-    ctx.scale(scale, scale);
-    ctx.drawImage(img, 0, 0);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     const dataURL = canvas.toDataURL("image/png");
 
     const fileId = generateId();
