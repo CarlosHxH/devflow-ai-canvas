@@ -119,10 +119,12 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
   // Realtime state
   const [collaborators, setCollaborators] = useState<string[]>([]);
-  const channelRef = useRef<RealtimeChannel | null>(null);       // ✅ tipo correto
-  const channelStatusRef = useRef<string>("");                    // ✅ rastreia status
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const channelStatusRef = useRef<string>("");
   const isRemoteUpdate = useRef(false);
   const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const remoteCollaboratorsRef = useRef<Map<string, any>>(new Map());
 
   useEffect(() => {
     if (projectId || currentWorkspace) {
