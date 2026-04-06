@@ -266,7 +266,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
           collaboratorsMap.set(key, value);
         });
 
-        apiRef.current.updateScene({ collaborators: collaboratorsMap });
+        apiRef.current.updateScene({ collaborators: collaboratorsMap as any });
       })
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
@@ -292,7 +292,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
           remoteCollaboratorsRef.current.forEach((value, key) => {
             collaboratorsMap.set(key, value);
           });
-          apiRef.current.updateScene({ collaborators: collaboratorsMap });
+          apiRef.current.updateScene({ collaborators: collaboratorsMap as any });
         }
       })
       .subscribe(async (status) => {
