@@ -550,7 +550,8 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         }
         theme="dark"
         langCode="pt-BR"
-        onChange={handleSceneChange}  // ✅ sem argumentos — lê estado internamente
+        onChange={handleSceneChange}
+        onPointerUpdate={handlePointerUpdate}
       />
     </div>
   );
