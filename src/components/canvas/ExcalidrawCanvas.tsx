@@ -149,6 +149,23 @@ export function ExcalidrawCanvas({ projectId }: Props) {
   // Track known file IDs to only send new ones
   const sentFileIds = useRef<Set<string>>(new Set());
 
+  const handlePointerUpdate = useCallback((payload: { pointer: { x: number; y: number }; button: string }) => {
+    if (!channelRef.current || !user || channelStatusRef.current !== "SUBSCRIBED") return;
+    if (pointerTimerRef.current) clearTimeout(pointerTimerRef.current);
+    pointerTimerRef.current = setTimeout(() => {
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "cursor-update",
+        payload: {
+          pointer: payload.pointer,
+          button: payload.button,
+          senderId: user.id,
+          username: user.user_metadata?.full_name || user.email || "Anônimo",
+        },
+      }).catch(() => {});
+    }, 50);
+  }, [user]);
+
   const handleSceneChange = useCallback(() => {
     if (isRemoteUpdate.current) return;
     if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
@@ -165,7 +182,6 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       const allFiles = apiRef.current.getFiles();
       const appState = apiRef.current.getAppState();
 
-      // Only send new files to avoid exceeding broadcast size limits
       const newFiles: Record<string, any> = {};
       for (const [id, file] of Object.entries(allFiles)) {
         if (!sentFileIds.current.has(id)) {
@@ -174,7 +190,6 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         }
       }
 
-      // Send elements (lightweight) always
       channelRef.current.send({
         type: "broadcast",
         event: "scene-update",
