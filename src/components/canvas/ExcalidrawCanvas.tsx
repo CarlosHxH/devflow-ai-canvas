@@ -119,6 +119,8 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
   const [canvasId, setCanvasId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [lastAutoSave, setLastAutoSave] = useState<number>(Date.now());
+  const autoSaveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [initialData, setInitialData] = useState<{
     elements: readonly ExcalidrawElement[];
     appState: Partial<AppState>;
