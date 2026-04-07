@@ -557,6 +557,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
             ? {
                 elements: initialData.elements as ExcalidrawElement[],
                 appState: initialData.appState,
+                files: initialData.files ? Object.values(initialData.files) as any : undefined,
               }
             : undefined
         }
