@@ -119,6 +119,8 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
   const [canvasId, setCanvasId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [lastAutoSave, setLastAutoSave] = useState<number>(Date.now());
+  const autoSaveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [initialData, setInitialData] = useState<{
     elements: readonly ExcalidrawElement[];
     appState: Partial<AppState>;
@@ -419,8 +421,52 @@ export function ExcalidrawCanvas({ projectId }: Props) {
     }
 
     setSaving(false);
+    setLastAutoSave(Date.now());
     toast({ title: "Canvas salvo!" });
   };
+
+  // Auto-save every 15 seconds
+  useEffect(() => {
+    if (!user || (!projectId && !currentWorkspace) || !apiRef.current) return;
+
+    autoSaveRef.current = setInterval(async () => {
+      if (!apiRef.current || saving) return;
+      const elements = apiRef.current.getSceneElements();
+      if (elements.length === 0) return;
+
+      const appState = apiRef.current.getAppState();
+      const files = apiRef.current.getFiles();
+      const saveData = {
+        elements,
+        files,
+        appState: {
+          viewBackgroundColor: (appState as any).viewBackgroundColor,
+          zoom: appState.zoom,
+          scrollX: appState.scrollX,
+          scrollY: appState.scrollY,
+        },
+      };
+
+      if (canvasId) {
+        await supabase.from("canvases").update({ react_flow_data: saveData as any }).eq("id", canvasId);
+      } else {
+        const insertData: any = {
+          name: projectId ? "Project Canvas" : "Workspace Canvas",
+          react_flow_data: saveData as any,
+          created_by: user.id,
+        };
+        if (projectId) insertData.project_id = projectId;
+        else insertData.workspace_id = currentWorkspace?.id;
+        const { data } = await supabase.from("canvases").insert(insertData).select("id").single();
+        if (data) setCanvasId(data.id);
+      }
+      setLastAutoSave(Date.now());
+    }, 15000);
+
+    return () => {
+      if (autoSaveRef.current) clearInterval(autoSaveRef.current);
+    };
+  }, [user, projectId, currentWorkspace, canvasId, saving]);
 
   const handleExport = async () => {
     if (!apiRef.current) return;
