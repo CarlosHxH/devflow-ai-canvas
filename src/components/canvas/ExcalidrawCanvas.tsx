@@ -372,12 +372,8 @@ export function ExcalidrawCanvas({ projectId }: Props) {
               ...flowData.appState,
               theme: "dark",
             },
+            files: files as BinaryFiles,
           });
-          setTimeout(() => {
-            if (apiRef.current && Object.keys(files).length > 0) {
-              apiRef.current.addFiles(Object.values(files) as any);
-            }
-          }, 500);
         }
       }
     } else {
