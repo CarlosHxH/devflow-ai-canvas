@@ -122,6 +122,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
   const [initialData, setInitialData] = useState<{
     elements: readonly ExcalidrawElement[];
     appState: Partial<AppState>;
+    files?: BinaryFiles;
   } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
@@ -371,12 +372,8 @@ export function ExcalidrawCanvas({ projectId }: Props) {
               ...flowData.appState,
               theme: "dark",
             },
+            files: files as BinaryFiles,
           });
-          setTimeout(() => {
-            if (apiRef.current && Object.keys(files).length > 0) {
-              apiRef.current.addFiles(Object.values(files) as any);
-            }
-          }, 500);
         }
       }
     } else {
@@ -560,6 +557,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
             ? {
                 elements: initialData.elements as ExcalidrawElement[],
                 appState: initialData.appState,
+                files: initialData.files ? Object.values(initialData.files) as any : undefined,
               }
             : undefined
         }
