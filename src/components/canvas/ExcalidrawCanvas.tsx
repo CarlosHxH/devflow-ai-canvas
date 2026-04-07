@@ -122,6 +122,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
   const [initialData, setInitialData] = useState<{
     elements: readonly ExcalidrawElement[];
     appState: Partial<AppState>;
+    files?: BinaryFiles;
   } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
