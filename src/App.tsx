@@ -21,6 +21,7 @@ import ProjectDashboard from "./pages/ProjectDashboard";
 import NotFound from "./pages/NotFound";
 
 import Users from "./pages/Users";
+import AdminWorkspaces from "./pages/AdminWorkspaces";
 
 const queryClient = new QueryClient();
 
@@ -65,6 +66,7 @@ const App = () => (
               <Route path="/workspace/new" element={<ProtectedRoute><CreateWorkspace /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><WorkspaceSettings /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
+              <Route path="/admin/workspaces" element={<ProtectedRoute><AdminWorkspaces /></ProtectedRoute>} />
               <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
               <Route path="/projects/:projectId/board" element={<ProtectedRoute><ProjectBoard /></ProtectedRoute>} />
               <Route path="/projects/:projectId/canvas" element={<ProtectedRoute><ProjectCanvas /></ProtectedRoute>} />
