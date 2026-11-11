@@ -1,5 +1,4 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -35,11 +34,10 @@ import {
   Users,
   ShieldCheck,
   } from "lucide-react";
-  import { useAuth } from "@/contexts/AuthContext";
-  import { useWorkspace } from "@/contexts/WorkspaceContext";
-  import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
-  import { NotificationMenu } from "./NotificationMenu";
+import { NotificationMenu } from "./NotificationMenu";
 
 const mainNav = [
   { title: "Dashboard", icon: LayoutDashboard, path: "/" },
@@ -53,26 +51,8 @@ const mainNav = [
 export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
   const { workspaces, currentWorkspace, setCurrentWorkspace } = useWorkspace();
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    setIsAdmin(false);
-    if (user) {
-      supabase
-        .from("user_roles")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("role", "admin")
-        .maybeSingle()
-        .then(({ data }) => {
-          if (active) setIsAdmin(Boolean(data));
-        });
-    }
-    return () => { active = false; };
-  }, [user]);
 
   const initials = user?.user_metadata?.full_name
     ?.split(" ")
