@@ -1,16 +1,26 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Excalidraw, exportToBlob } from "@excalidraw/excalidraw";
+import { Excalidraw, exportToBlob, convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import type { ExcalidrawElementSkeleton } from "@excalidraw/excalidraw/data/transform";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Save, Loader2, Download, Sparkles, Users, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Save, Loader2, Download, Sparkles, Users, X, Table } from "lucide-react";
 import mermaid from "mermaid";
 
 mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "loose" });
@@ -128,6 +138,10 @@ export function ExcalidrawCanvas({ projectId }: Props) {
   } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const [showTableDialog, setShowTableDialog] = useState(false);
+  const [tableRows, setTableRows] = useState(3);
+  const [tableColumns, setTableColumns] = useState(3);
 
   // AI prompt state
   const [showAiPanel, setShowAiPanel] = useState(false);
@@ -488,6 +502,69 @@ export function ExcalidrawCanvas({ projectId }: Props) {
     }
   };
 
+  const handleInsertTable = () => {
+    const api = apiRef.current;
+    const container = canvasContainerRef.current;
+    if (!api || !container) return;
+
+    if (
+      !Number.isInteger(tableRows) ||
+      !Number.isInteger(tableColumns) ||
+      tableRows < 1 ||
+      tableRows > 10 ||
+      tableColumns < 1 ||
+      tableColumns > 10
+    ) {
+      toast({
+        title: "Dimensões inválidas",
+        description: "Escolha entre 1 e 10 linhas e colunas.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const cellWidth = 180;
+    const cellHeight = 56;
+    const tableWidth = tableColumns * cellWidth;
+    const tableHeight = tableRows * cellHeight;
+    const { scrollX, scrollY, zoom } = api.getAppState();
+    const bounds = container.getBoundingClientRect();
+    const startX = -scrollX + bounds.width / 2 / zoom.value - tableWidth / 2;
+    const startY = -scrollY + bounds.height / 2 / zoom.value - tableHeight / 2;
+    const skeleton: ExcalidrawElementSkeleton[] = [];
+
+    for (let row = 0; row < tableRows; row += 1) {
+      for (let column = 0; column < tableColumns; column += 1) {
+        skeleton.push({
+          type: "rectangle",
+          x: startX + column * cellWidth,
+          y: startY + row * cellHeight,
+          width: cellWidth,
+          height: cellHeight,
+          strokeColor: row === 0 ? "#a1a1aa" : "#d4d4d8",
+          backgroundColor: row === 0 ? "#27272a" : "transparent",
+          fillStyle: "solid",
+          strokeWidth: 1,
+          roughness: 0,
+          ...(row === 0
+            ? { label: { text: `Coluna ${column + 1}`, fontSize: 16 } }
+            : {}),
+        });
+      }
+    }
+
+    const tableElements = convertToExcalidrawElements(skeleton);
+    const selectedElementIds = Object.fromEntries(
+      tableElements.map((element) => [element.id, true]),
+    );
+    api.updateScene({
+      elements: [...api.getSceneElements(), ...tableElements],
+      appState: { selectedElementIds },
+    });
+    setShowTableDialog(false);
+    toast({ title: "Tabela inserida no canvas" });
+  };
+
   const handleAiGenerate = async () => {
     if (!aiPrompt.trim() || !apiRef.current) return;
     setAiLoading(true);
@@ -532,7 +609,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
   }
 
   return (
-    <div className="relative h-[calc(100vh-8rem)] border rounded-lg overflow-hidden">
+    <div ref={canvasContainerRef} className="relative h-[calc(100vh-8rem)] border rounded-lg overflow-hidden">
       <div className="absolute top-3 right-3 z-10 flex gap-2">
         {collaborators.length > 0 && (
           <div className="flex items-center gap-1 bg-card/90 backdrop-blur-sm border rounded-md px-2 py-1 shadow-lg">
@@ -552,6 +629,15 @@ export function ExcalidrawCanvas({ projectId }: Props) {
           <Sparkles className="h-3 w-3 mr-1" /> IA
         </Button>
 
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setShowTableDialog(true)}
+          className="shadow-lg bg-card"
+        >
+          <Table className="h-3 w-3 mr-1" /> Tabela
+        </Button>
+
         {(projectId || currentWorkspace) && (
           <Button size="sm" onClick={handleSave} disabled={saving} className="gradient-primary shadow-lg">
             {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
@@ -563,6 +649,45 @@ export function ExcalidrawCanvas({ projectId }: Props) {
           <Download className="h-3 w-3 mr-1" /> PNG
         </Button>
       </div>
+
+      <Dialog open={showTableDialog} onOpenChange={setShowTableDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Inserir tabela</DialogTitle>
+            <DialogDescription>
+              Escolha o número de linhas e colunas. As células poderão ser editadas no canvas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="space-y-2 text-sm font-medium">
+              Linhas
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                value={tableRows}
+                onChange={(event) => setTableRows(Number(event.target.value))}
+              />
+            </label>
+            <label className="space-y-2 text-sm font-medium">
+              Colunas
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                value={tableColumns}
+                onChange={(event) => setTableColumns(Number(event.target.value))}
+              />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTableDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleInsertTable}>Inserir tabela</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {showAiPanel && (
         <div className="absolute top-14 right-3 z-10 w-80 bg-card/95 backdrop-blur-sm border rounded-lg shadow-xl p-4 space-y-3">
