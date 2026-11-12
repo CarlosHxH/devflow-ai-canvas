@@ -514,6 +514,7 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
+      shares_workspace: { Args: { _a: string; _b: string }; Returns: boolean }
     }
     Enums: {
       app_role: "owner" | "admin" | "member"
