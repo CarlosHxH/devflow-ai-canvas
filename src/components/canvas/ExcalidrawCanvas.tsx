@@ -20,7 +20,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Save, Loader2, Download, Sparkles, Users, X, Table } from "lucide-react";
+import { Save, Loader2, Download, Sparkles, Users, X, Plus, Pencil } from "lucide-react";
+import { parseMermaidToExcalidraw } from "@excalidraw/mermaid-to-excalidraw";
+import { CanvasContentEditor } from "./CanvasContentEditor";
+import { buildMarkdown, buildTable, blockOrigin, placeAndTag, selectionIds, type BlockKind, type BlockMeta } from "@/lib/canvasContent";
 import mermaid from "mermaid";
 
 mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "loose" });
@@ -139,9 +142,9 @@ export function ExcalidrawCanvas({ projectId }: Props) {
   const [loaded, setLoaded] = useState(false);
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
-  const [showTableDialog, setShowTableDialog] = useState(false);
-  const [tableRows, setTableRows] = useState(3);
-  const [tableColumns, setTableColumns] = useState(3);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingBlock, setEditingBlock] = useState<BlockMeta | null>(null);
+  const [selectedBlock, setSelectedBlock] = useState<BlockMeta | null>(null);
 
   // AI prompt state
   const [showAiPanel, setShowAiPanel] = useState(false);
@@ -531,67 +534,79 @@ export function ExcalidrawCanvas({ projectId }: Props) {
     }
   };
 
-  const handleInsertTable = () => {
-    const api = apiRef.current;
-    const container = canvasContainerRef.current;
-    if (!api || !container) return;
-
-    if (
-      !Number.isInteger(tableRows) ||
-      !Number.isInteger(tableColumns) ||
-      tableRows < 1 ||
-      tableRows > 10 ||
-      tableColumns < 1 ||
-      tableColumns > 10
-    ) {
-      toast({
-        title: "Dimensões inválidas",
-        description: "Escolha entre 1 e 10 linhas e colunas.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const cellWidth = 180;
-    const cellHeight = 56;
-    const tableWidth = tableColumns * cellWidth;
-    const tableHeight = tableRows * cellHeight;
-    const { scrollX, scrollY, zoom } = api.getAppState();
-    const bounds = container.getBoundingClientRect();
-    const startX = -scrollX + bounds.width / 2 / zoom.value - tableWidth / 2;
-    const startY = -scrollY + bounds.height / 2 / zoom.value - tableHeight / 2;
-    const skeleton: ExcalidrawElementSkeleton[] = [];
-
-    for (let row = 0; row < tableRows; row += 1) {
-      for (let column = 0; column < tableColumns; column += 1) {
-        skeleton.push({
-          type: "rectangle",
-          x: startX + column * cellWidth,
-          y: startY + row * cellHeight,
-          width: cellWidth,
-          height: cellHeight,
-          strokeColor: row === 0 ? "#a1a1aa" : "#d4d4d8",
-          backgroundColor: row === 0 ? "#27272a" : "transparent",
-          fillStyle: "solid",
-          strokeWidth: 1,
-          roughness: 0,
-          ...(row === 0
-            ? { label: { text: `Coluna ${column + 1}`, fontSize: 16 } }
-            : {}),
-        });
+  const buildBlock = async (kind: BlockKind, source: string) => {
+    let elements: any[] = [];
+    let files: any[] = [];
+    if (kind === "table") elements = buildTable(source);
+    else if (kind === "markdown") elements = buildMarkdown(source);
+    else {
+      try {
+        const { elements: skel, files: f } = await parseMermaidToExcalidraw(source, { themeVariables: { fontSize: "16px" } });
+        elements = convertToExcalidrawElements(skel as any, { regenerateIds: true }) as any[];
+        files = f ? Object.values(f) : [];
+        if (elements.length === 0) throw new Error("vazio");
+      } catch {
+        const img = await mermaidToImageElement(source);
+        if (!img) throw new Error("Código Mermaid inválido");
+        elements = [img.element];
+        files = [img.file];
       }
     }
+    return { elements, files };
+  };
 
-    const tableElements = convertToExcalidrawElements(skeleton);
-    const selectedElementIds = Object.fromEntries(
-      tableElements.map((element) => [element.id, true as const]),
-    );
-    api.updateScene({
-      elements: [...api.getSceneElements(), ...tableElements],
-      appState: { selectedElementIds },
-    });
-    setShowTableDialog(false);
-    toast({ title: "Tabela inserida no canvas" });
+  const viewportCenter = () => {
+    const st = apiRef.current!.getAppState();
+    const rect = canvasContainerRef.current?.getBoundingClientRect();
+    return {
+      x: -st.scrollX + (rect?.width ?? window.innerWidth) / 2 / st.zoom.value,
+      y: -st.scrollY + (rect?.height ?? window.innerHeight) / 2 / st.zoom.value,
+    };
+  };
+
+  const insertBlock = async (kind: BlockKind, source: string) => {
+    const api = apiRef.current;
+    if (!api) return;
+    try {
+      const built = await buildBlock(kind, source);
+      const all = api.getSceneElementsIncludingDeleted();
+      let x: number, y: number;
+      let rest: any[] = all as any[];
+      const editId = editingBlock?.blockId;
+      if (editId) {
+        const old = all.filter((e: any) => e.customData?.blockId === editId && !e.isDeleted);
+        ({ x, y } = old.length ? blockOrigin(old) : viewportCenter());
+        rest = all.map((e: any) =>
+          e.customData?.blockId === editId
+            ? { ...e, isDeleted: true, version: e.version + 1, versionNonce: Math.floor(Math.random() * 2 ** 31), updated: Date.now() }
+            : e,
+        );
+      } else {
+        const c = viewportCenter();
+        const w = Math.max(...built.elements.map((e) => e.x + e.width)) - Math.min(...built.elements.map((e) => e.x));
+        const h = Math.max(...built.elements.map((e) => e.y + e.height)) - Math.min(...built.elements.map((e) => e.y));
+        x = c.x - w / 2;
+        y = c.y - h / 2;
+      }
+      const placed = placeAndTag(built.elements, x, y, kind, source);
+      if (built.files.length) api.addFiles(built.files);
+      api.updateScene({
+        elements: [...rest, ...placed],
+        appState: { selectedElementIds: selectionIds(placed), selectedGroupIds: { [placed[0].customData.blockId]: true } } as any,
+      });
+      setEditorOpen(false);
+      setEditingBlock(null);
+      toast({ title: editId ? "Conteúdo atualizado" : "Conteúdo inserido no canvas" });
+      setTimeout(handleSceneChange, 100);
+    } catch (e: any) {
+      toast({ title: "Erro ao inserir", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  const openEditSelected = () => {
+    if (!selectedBlock) return;
+    setEditingBlock(selectedBlock);
+    setEditorOpen(true);
   };
 
   const handleAiGenerate = async () => {
@@ -604,20 +619,8 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       if (error) throw error;
       if (!data?.mermaid_code) throw new Error("Sem código Mermaid na resposta");
 
-      const result = await mermaidToImageElement(data.mermaid_code);
-      if (!result) throw new Error("Erro ao renderizar diagrama");
-
-      const appState = apiRef.current.getAppState();
-      result.element.x =
-        -appState.scrollX + window.innerWidth / 2 / appState.zoom.value - result.element.width / 2;
-      result.element.y =
-        -appState.scrollY + window.innerHeight / 2 / appState.zoom.value - result.element.height / 2;
-
-      apiRef.current.addFiles([result.file as any]);
-      const currentElements = apiRef.current.getSceneElements();
-      apiRef.current.updateScene({ elements: [...currentElements, result.element] });
-
-      toast({ title: "Diagrama inserido no canvas!" });
+      setEditingBlock(null);
+      await insertBlock("mermaid", data.mermaid_code);
       setAiPrompt("");
       setShowAiPanel(false);
       setTimeout(handleSceneChange, 200); // ✅ propaga via broadcast
@@ -661,11 +664,17 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         <Button
           size="sm"
           variant="outline"
-          onClick={() => setShowTableDialog(true)}
+          onClick={() => { setEditingBlock(null); setEditorOpen(true); }}
           className="shadow-lg bg-card"
         >
-          <Table className="h-3 w-3 mr-1" /> Tabela
+          <Plus className="h-3 w-3 mr-1" /> Inserir
         </Button>
+
+        {selectedBlock && (
+          <Button size="sm" variant="outline" onClick={openEditSelected} className="shadow-lg bg-card">
+            <Pencil className="h-3 w-3 mr-1" /> Editar
+          </Button>
+        )}
 
         {(projectId || currentWorkspace) && (
           <Button size="sm" onClick={handleSave} disabled={saving} className="gradient-primary shadow-lg">
@@ -679,44 +688,13 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         </Button>
       </div>
 
-      <Dialog open={showTableDialog} onOpenChange={setShowTableDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Inserir tabela</DialogTitle>
-            <DialogDescription>
-              Escolha o número de linhas e colunas. As células poderão ser editadas no canvas.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-4">
-            <label className="space-y-2 text-sm font-medium">
-              Linhas
-              <Input
-                type="number"
-                min={1}
-                max={10}
-                value={tableRows}
-                onChange={(event) => setTableRows(Number(event.target.value))}
-              />
-            </label>
-            <label className="space-y-2 text-sm font-medium">
-              Colunas
-              <Input
-                type="number"
-                min={1}
-                max={10}
-                value={tableColumns}
-                onChange={(event) => setTableColumns(Number(event.target.value))}
-              />
-            </label>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTableDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleInsertTable}>Inserir tabela</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CanvasContentEditor
+        open={editorOpen}
+        onOpenChange={(o) => { setEditorOpen(o); if (!o) setEditingBlock(null); }}
+        initial={editingBlock}
+        editing={Boolean(editingBlock)}
+        onSubmit={insertBlock}
+      />
 
       {showAiPanel && (
         <div className="absolute top-14 right-3 z-10 w-80 bg-card/95 backdrop-blur-sm border rounded-lg shadow-xl p-4 space-y-3">
@@ -763,7 +741,13 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         }
         theme="dark"
         langCode="pt-BR"
-        onChange={handleSceneChange}
+        onChange={(els, st) => {
+          const sel = (els as any[]).filter((e) => st.selectedElementIds[e.id] && e.customData?.blockId);
+          const ids = new Set(sel.map((e) => e.customData.blockId));
+          const meta = ids.size === 1 ? (sel[0].customData as BlockMeta) : null;
+          setSelectedBlock((prev) => (prev?.blockId === meta?.blockId && prev?.source === meta?.source ? prev : meta));
+          handleSceneChange();
+        }}
         onPointerUpdate={handlePointerUpdate}
       />
     </div>
