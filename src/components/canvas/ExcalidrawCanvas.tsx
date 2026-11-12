@@ -157,6 +157,8 @@ export function ExcalidrawCanvas({ projectId }: Props) {
   const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const remoteCollaboratorsRef = useRef<Map<string, any>>(new Map());
+  const lastSentVersionRef = useRef<string>("");
+  const [reconnectKey, setReconnectKey] = useState(0);
 
   useEffect(() => {
     if (projectId || currentWorkspace) {
@@ -210,7 +212,12 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         channelStatusRef.current !== "SUBSCRIBED"
       ) return;
 
-      const elements = apiRef.current.getSceneElements();
+      const elements = apiRef.current.getSceneElementsIncludingDeleted();
+      const signature = elements.map((e) => `${e.id}:${e.version}`).join(",");
+      const filesCount = Object.keys(apiRef.current.getFiles()).length;
+      const sig = `${signature}|${filesCount}`;
+      if (sig === lastSentVersionRef.current) return;
+      lastSentVersionRef.current = sig;
       const allFiles = apiRef.current.getFiles();
       const appState = apiRef.current.getAppState();
 
@@ -228,12 +235,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         payload: {
           elements: JSON.parse(JSON.stringify(elements)),
           files: Object.keys(newFiles).length > 0 ? newFiles : null,
-          appState: {
-            viewBackgroundColor: appState.viewBackgroundColor,
-            zoom: appState.zoom,
-            scrollX: appState.scrollX,
-            scrollY: appState.scrollY,
-          },
+          appState: { viewBackgroundColor: appState.viewBackgroundColor },
           senderId: user.id,
         },
       }).catch((err: any) => console.warn("Broadcast error:", err));
@@ -255,7 +257,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
     }
 
     const channel = supabase.channel(channelName, {
-      config: { broadcast: { self: false } },
+      config: { broadcast: { self: false }, presence: { key: user.id } },
     });
 
     channel
@@ -267,11 +269,30 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         isRemoteUpdate.current = true;
         
         try {
-          apiRef.current.updateScene({ elements, appState });
-
           if (files && Object.keys(files).length > 0) {
             apiRef.current.addFiles(Object.values(files) as any);
+            Object.keys(files).forEach((id) => sentFileIds.current.add(id));
           }
+
+          // Merge by element version so local edits are not overwritten
+          const local = apiRef.current.getSceneElementsIncludingDeleted();
+          const merged = new Map<string, any>(local.map((e) => [e.id, e]));
+          for (const remote of elements as any[]) {
+            const current = merged.get(remote.id);
+            if (
+              !current ||
+              remote.version > current.version ||
+              (remote.version === current.version && remote.versionNonce < current.versionNonce)
+            ) {
+              merged.set(remote.id, remote);
+            }
+          }
+          const mergedElements = Array.from(merged.values());
+          lastSentVersionRef.current = `${mergedElements.map((e) => `${e.id}:${e.version}`).join(",")}|${Object.keys(apiRef.current.getFiles()).length}`;
+          apiRef.current.updateScene({
+            elements: mergedElements,
+            appState: appState?.viewBackgroundColor ? { viewBackgroundColor: appState.viewBackgroundColor } : undefined,
+          });
         } catch (err) {
           console.warn("Error applying remote scene:", err);
         }
@@ -299,6 +320,13 @@ export function ExcalidrawCanvas({ projectId }: Props) {
         });
 
         apiRef.current.updateScene({ collaborators: collaboratorsMap as any });
+      })
+      .on("presence", { event: "join" }, ({ key }: any) => {
+        if (key === user.id) return;
+        // A new collaborator joined: resend full scene and all files
+        sentFileIds.current.clear();
+        lastSentVersionRef.current = "";
+        handleSceneChange();
       })
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
@@ -345,6 +373,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
             channelRef.current = null;
             channelStatusRef.current = "";
             setCollaborators([]);
+            setReconnectKey((k) => k + 1);
           }, 3000);
         }
       });
@@ -359,7 +388,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
       channelStatusRef.current = "";
       remoteCollaboratorsRef.current.clear();
     };
-  }, [projectId, currentWorkspace, user]);
+  }, [projectId, currentWorkspace?.id, user?.id, reconnectKey, handleSceneChange]);
 
   const loadCanvas = async () => {
     const query = supabase.from("canvases").select("*") as any;
@@ -555,7 +584,7 @@ export function ExcalidrawCanvas({ projectId }: Props) {
 
     const tableElements = convertToExcalidrawElements(skeleton);
     const selectedElementIds = Object.fromEntries(
-      tableElements.map((element) => [element.id, true]),
+      tableElements.map((element) => [element.id, true as const]),
     );
     api.updateScene({
       elements: [...api.getSceneElements(), ...tableElements],
